@@ -35,6 +35,12 @@
 #include <tbb/task_arena.h>
 #include <sys/time.h>
 
+enum startRectOverride {
+  STARTRECT_NO_OVERRIDE,
+  STARTRECT_OVERRIDE_WEBP,
+  STARTRECT_OVERRIDE_KASMVIDEO,
+};
+
 namespace rfb {
   class SConnection;
   class Encoder;
@@ -103,7 +109,7 @@ namespace rfb {
     int computeNumRects(const Region& changed);
 
     Encoder *startRect(const Rect& rect, int type, const bool trackQuality = true,
-                       const uint8_t isWebp = 0);
+                       const enum startRectOverride overrider = STARTRECT_NO_OVERRIDE);
     void endRect(const uint8_t isWebp = 0);
 
     void writeCopyRects(const Region& copied, const Point& delta);

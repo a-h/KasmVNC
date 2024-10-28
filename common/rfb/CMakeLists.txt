@@ -25,6 +25,7 @@ set(RFB_SOURCES
         HextileEncoder.cxx
         JpegCompressor.cxx
         JpegDecompressor.cxx
+        KasmVideoEncoder.cxx
         KeyRemapper.cxx
         LogWriter.cxx
         Logger.cxx

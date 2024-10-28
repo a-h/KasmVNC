@@ -29,6 +29,7 @@ namespace rfb {
   const int encodingTight = 7;
   const int encodingUdp = 8;
   const int encodingZRLE = 16;
+  const int encodingKasmVideo = 17;
 
   const int encodingMax = 255;
 
