@@ -43,6 +43,7 @@ RUN \
     libxrandr-dev \
     libxshmfence-dev \
     libxtst-dev \
+    libvpx-dev \
     mesa-dev \
     mesa-dri-gallium \
     meson \
