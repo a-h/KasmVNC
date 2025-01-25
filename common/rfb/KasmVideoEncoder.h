@@ -26,11 +26,6 @@ struct hevc_t;
 
 namespace rfb {
 
-  // Kasm Video Encodings
-  const int kasmVideoVP8 = 0;  // VP8 encoding
-  const int kasmVideoHEVC = 1; // HEVC encoding
-  const int kasmVideoSkip = 2; // Skip frame
-  
   class KasmVideoEncoder : public Encoder {
   public:
     KasmVideoEncoder(SConnection* conn);

@@ -19,7 +19,9 @@
 #define __RFB_KASMVIDEOCONSTANTS_H__
 namespace rfb {
   // Compression control
-  const unsigned int kasmVideoSkip = 0x00;
-  const unsigned int kasmVideoVP8 = 0x01;
+  const unsigned int kasmVideoVP8 = 0x01;  // VP8 encoding
+  const unsigned int kasmVideoHEVC = 0x02; // HEVC encoding
+  const unsigned int kasmVideoSkip = 0x00; // Skip frame
+
 }
 #endif

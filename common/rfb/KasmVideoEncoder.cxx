@@ -25,7 +25,9 @@
 #include <rfb/KasmVideoConstants.h>
 
 #include <libavcodec/avcodec.h>
+extern "C" {
 #include <libavformat/avformat.h>
+}
 #include <libavutil/hwcontext.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
