@@ -44,6 +44,7 @@ RUN \
     libxshmfence-dev \
     libxtst-dev \
     libvpx-dev \
+    libva-dev \
     mesa-dev \
     mesa-dri-gallium \
     meson \
