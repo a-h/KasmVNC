@@ -293,7 +293,7 @@ rfb::IntParameter rfb::Server::videoBitrate
  300, 0, 10000);
 rfb::StringParameter rfb::Server::videoCodec
 ("videoCodec",
- "If set, use this codec to send a video stream for WebCodecs. Supported options: vp8",
+ "If set, use this codec to send a video stream for WebCodecs. Supported options: h264",
  "");
 
 static void bandwidthPreset() {

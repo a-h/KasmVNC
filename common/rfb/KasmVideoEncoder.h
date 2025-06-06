@@ -19,34 +19,43 @@
 #define __RFB_KASMVIDEOENCODER_H__
 
 #include <rfb/Encoder.h>
-#include <stdint.h>
-#include <vector>
+#include <cstdint>
 
-struct h264_t;
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
+
+struct h264_t {
+    AVCodecContext *ctx;
+    AVFrame *frame;
+    AVPacket pkt;
+};
 
 namespace rfb {
+    class KasmVideoEncoder : public Encoder {
+    public:
+        explicit KasmVideoEncoder(SConnection *conn);
 
-  class KasmVideoEncoder : public Encoder {
-  public:
-    KasmVideoEncoder(SConnection* conn);
-    virtual ~KasmVideoEncoder();
+        ~KasmVideoEncoder() override = default;
 
-    virtual bool isSupported();
+        bool isSupported() override;
 
-    virtual void writeRect(const PixelBuffer* pb, const Palette& palette);
-    virtual void writeSkipRect();
-    virtual void writeSolidRect(int width, int height,
-                                const PixelFormat& pf,
-                                const rdr::U8* colour);
+        void writeRect(const PixelBuffer *pb, const Palette &palette) override;
 
-  protected:
-    void writeCompact(rdr::U32 value, rdr::OutStream* os) const;
+        virtual void writeSkipRect();
 
-  private:
-    bool init;
-    uint32_t sw, sh;
+        void writeSolidRect(int width, int height,
+                            const PixelFormat &pf,
+                            const rdr::U8 *colour) override;
 
-    h264_t *h264;
-  };
+    protected:
+        static void writeCompact(rdr::U32 value, rdr::OutStream *os);
+
+    private:
+        bool init{false};
+        uint32_t sw{0}, sh{0};
+
+        h264_t h264{};
+    };
 }
 #endif
