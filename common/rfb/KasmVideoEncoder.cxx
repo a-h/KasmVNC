@@ -49,7 +49,7 @@ bool is_acceleration_available() {
     return true;
 }
 
-inline static const bool hw_accel = is_acceleration_available();
+inline static bool hw_accel = is_acceleration_available();
 
 using namespace rfb;
 static LogWriter vlog("KasmVideoEncoder");
@@ -64,54 +64,15 @@ bool KasmVideoEncoder::isSupported() {
     return conn->cp.supportsEncoding(encodingKasmVideo);
 }
 
-static void init_h264(h264_t *h264,
-                      const uint32_t w, const uint32_t h, const uint32_t fps,
-                      const uint32_t bitrate) {
-    const AVCodec *codec = nullptr;
-
-    if (!hw_accel) {
-        codec = avcodec_find_encoder(AV_CODEC_ID_H264);
-        h264->ctx = avcodec_alloc_context3(codec);
-        if (!h264->ctx) {
-            vlog.error("Can't allocate AVCodecContext");
-            return;
-        }
-    } else {
-        AVHWDeviceType devtype = AV_HWDEVICE_TYPE_VAAPI;
-        AVBufferRef *hw_device_ctx = nullptr;
-
-        av_hwdevice_ctx_create(&hw_device_ctx, devtype, render_path, nullptr, 0);
-        if (!hw_device_ctx) {
-            vlog.error("Failed to create VAAPI device context");
-            return;
-        }
-
-        codec = avcodec_find_encoder_by_name("h264_vaapi");
-
-        h264->ctx = avcodec_alloc_context3(codec);
-        if (!h264->ctx) {
-            vlog.error("Can't allocate AVCodecContext");
-            av_buffer_unref(&hw_device_ctx);
-            return;
-        }
-
-        h264->ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
-        if (!h264->ctx->hw_device_ctx) {
-            vlog.error("Failed to reference VAAPI device context");
-            avcodec_free_context(&h264->ctx);
-            av_buffer_unref(&hw_device_ctx);
-            return;
-        }
-    }
-
+bool init_codec(int w, int h, int fps, const AVCodec *codec, h264_t *h264) {
     h264->frame = av_frame_alloc();
     if (!h264->frame) {
         vlog.error("Can't allocate AVFrame");
         avcodec_free_context(&h264->ctx);
-        return;
+        return false;
     }
 
-    h264->frame->format = AV_PIX_FMT_VAAPI;
+    h264->frame->format = hw_accel ? AV_PIX_FMT_VAAPI : AV_PIX_FMT_RGB24;
     h264->frame->width = w;
     h264->frame->height = h;
     if (av_image_alloc(h264->frame->data, h264->frame->linesize, h264->frame->width, h264->frame->height,
@@ -119,7 +80,7 @@ static void init_h264(h264_t *h264,
         vlog.error("Failed to allocate image");
         avcodec_free_context(&h264->ctx);
         av_frame_free(&h264->frame);
-        return;
+        return false;
     }
 
     h264->ctx->width = w;
@@ -132,7 +93,77 @@ static void init_h264(h264_t *h264,
         vlog.error("Failed to open codec");
         avcodec_free_context(&h264->ctx);
         av_frame_free(&h264->frame);
-        return;
+        return false;
+    }
+
+    return true;
+}
+
+bool create_software_encoder(int width, int height, int fps, h264_t *h264) {
+    const auto *codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+    h264->ctx = avcodec_alloc_context3(codec);
+    if (!h264->ctx) {
+        vlog.error("Can't allocate AVCodecContext");
+        return false;
+    }
+
+    if (!init_codec(width, height, fps, codec, h264))
+        return false;
+
+    return true;
+}
+
+bool try_create_vaapi_encoder(int width, int height, int fps, h264_t *h264, AVBufferRef *hw_device_ctx) {
+    av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, render_path, nullptr, 0);
+    if (!hw_device_ctx) {
+        vlog.error("Failed to create VAAPI device context");
+        return false;
+    }
+
+    const auto *codec = avcodec_find_encoder_by_name("h264_vaapi");
+
+    h264->ctx = avcodec_alloc_context3(codec);
+    if (!h264->ctx) {
+        vlog.error("Can't allocate AVCodecContext");
+        av_buffer_unref(&hw_device_ctx);
+        return false;
+    }
+
+    h264->ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+    if (!h264->ctx->hw_device_ctx) {
+        vlog.error("Failed to reference VAAPI device context");
+        avcodec_free_context(&h264->ctx);
+        av_buffer_unref(&hw_device_ctx);
+        return false;
+    }
+
+    if (!init_codec(width, height, fps, codec, h264))
+        return false;
+
+    return true;
+}
+
+static void init_h264(h264_t *h264,
+                      const uint32_t w, const uint32_t h, const uint32_t fps,
+                      const uint32_t bitrate) {
+    AVBufferRef *hw_device_ctx{};
+    bool success{};
+    if (!hw_accel) {
+        success = create_software_encoder(w, h, fps, h264);
+    } else {
+        success = try_create_vaapi_encoder(w, h, fps, h264, hw_device_ctx);
+        if (!success) {
+            hw_accel = false;
+            if (success = create_software_encoder(w, h, fps, h264); !success) {
+                vlog.error("Failed to create software encoder");
+                return;
+            }
+        }
+    }
+
+    if (!h264->ctx) {
+        vlog.error("Can't allocate AVFrame");
+        avcodec_free_context(&h264->ctx);
     }
 }
 
