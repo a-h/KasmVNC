@@ -164,57 +164,55 @@ static void updateMaxVideoRes(uint16_t *x, uint16_t *y) {
   }
 }
 
-EncodeManager::EncodeManager(SConnection* conn_, EncCache *encCache_) : conn(conn_),
-  dynamicQualityMin(-1), dynamicQualityOff(-1),
-  areaCur(0), videoDetected(false), videoTimer(this),
-  watermarkStats(0),
-  maxEncodingTime(0), framesSinceEncPrint(0),
-  encCache(encCache_)
+EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_) :
+    conn(conn_), dynamicQualityMin(-1), dynamicQualityOff(-1), areaCur(0), videoDetected(false), videoTimer(this),
+    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), encCache(encCache_)
 {
-  StatsVector::iterator iter;
+    encoders.resize(encoderClassMax, nullptr);
+    activeEncoders.resize(encoderTypeMax, encoderRaw);
 
-  encoders.resize(encoderClassMax, NULL);
-  activeEncoders.resize(encoderTypeMax, encoderRaw);
+    encoders[encoderRaw] = new RawEncoder(conn);
+    encoders[encoderRRE] = new RREEncoder(conn);
+    encoders[encoderHextile] = new HextileEncoder(conn);
+    encoders[encoderTight] = new TightEncoder(conn);
+    encoders[encoderTightJPEG] = new TightJPEGEncoder(conn);
+    encoders[encoderTightWEBP] = new TightWEBPEncoder(conn);
+    encoders[encoderTightQOI] = new TightQOIEncoder(conn);
+    encoders[encoderZRLE] = new ZRLEEncoder(conn);
 
-  encoders[encoderRaw] = new RawEncoder(conn);
-  encoders[encoderRRE] = new RREEncoder(conn);
-  encoders[encoderHextile] = new HextileEncoder(conn);
-  encoders[encoderTight] = new TightEncoder(conn);
-  encoders[encoderTightJPEG] = new TightJPEGEncoder(conn);
-  encoders[encoderTightWEBP] = new TightWEBPEncoder(conn);
-  encoders[encoderTightQOI] = new TightQOIEncoder(conn);
-  encoders[encoderZRLE] = new ZRLEEncoder(conn);
-  encoders[encoderKasmVideo] = new KasmVideoEncoder(conn);
+    encoders[encoderKasmVideo] = new H264SoftwareEncoder(conn, Server::frameRate, Server::videoBitrate);
 
-  webpBenchResult = ((TightWEBPEncoder *) encoders[encoderTightWEBP])->benchmark();
-  vlog.info("WEBP benchmark result: %u ms", webpBenchResult);
+    webpBenchResult = ((TightWEBPEncoder *) encoders[encoderTightWEBP])->benchmark();
+    vlog.info("WEBP benchmark result: %u ms", webpBenchResult);
 
-  unsigned videoTime = rfb::Server::videoTime;
-  if (videoTime < 1) videoTime = 1;
-  //areaPercentages = new unsigned char[videoTime * rfb::Server::frameRate]();
-  // maximum possible values, as they may change later at runtime
-  areaPercentages = new unsigned char[2000 * 60]();
+    unsigned videoTime = rfb::Server::videoTime;
+    if (videoTime < 1)
+        videoTime = 1;
+    // areaPercentages = new unsigned char[videoTime * rfb::Server::frameRate]();
+    //  maximum possible values, as they may change later at runtime
+    areaPercentages = new unsigned char[2000 * 60]();
 
-  if (!rfb::Server::videoTime)
-    videoDetected = true;
+    if (!rfb::Server::videoTime)
+        videoDetected = true;
 
-  updateMaxVideoRes(&maxVideoX, &maxVideoY);
+    updateMaxVideoRes(&maxVideoX, &maxVideoY);
 
-  updates = 0;
-  memset(&copyStats, 0, sizeof(copyStats));
-  stats.resize(encoderClassMax);
-  for (iter = stats.begin();iter != stats.end();++iter) {
-    StatsVector::value_type::iterator iter2;
-    iter->resize(encoderTypeMax);
-    for (iter2 = iter->begin();iter2 != iter->end();++iter2)
-      memset(&*iter2, 0, sizeof(EncoderStats));
-  }
+    updates = 0;
+    memset(&copyStats, 0, sizeof(copyStats));
+    stats.resize(encoderClassMax);
+    for (auto iter = stats.begin(); iter != stats.end(); ++iter)
+    {
+        StatsVector::value_type::iterator iter2;
+        iter->resize(encoderTypeMax);
+        for (iter2 = iter->begin(); iter2 != iter->end(); ++iter2)
+            memset(&*iter2, 0, sizeof(EncoderStats));
+    }
 
-  if (Server::dynamicQualityMax && Server::dynamicQualityMax <= 9 &&
-      Server::dynamicQualityMax > Server::dynamicQualityMin) {
-    dynamicQualityMin = Server::dynamicQualityMin;
-    dynamicQualityOff = Server::dynamicQualityMax - Server::dynamicQualityMin;
-  }
+    if (Server::dynamicQualityMax && Server::dynamicQualityMax <= 9 &&
+        Server::dynamicQualityMax > Server::dynamicQualityMin) {
+        dynamicQualityMin = Server::dynamicQualityMin;
+        dynamicQualityOff = Server::dynamicQualityMax - Server::dynamicQualityMin;
+    }
 
     const auto num_cores = cpu_info::cores_count;
     arena.initialize(num_cores);
@@ -222,17 +220,15 @@ EncodeManager::EncodeManager(SConnection* conn_, EncCache *encCache_) : conn(con
 
 EncodeManager::~EncodeManager()
 {
-  std::vector<Encoder*>::iterator iter;
+    logStats();
 
-  logStats();
+    delete[] areaPercentages;
 
-  delete [] areaPercentages;
+    for (auto iter = encoders.begin(); iter != encoders.end(); ++iter)
+        delete *iter;
 
-  for (iter = encoders.begin();iter != encoders.end();iter++)
-    delete *iter;
-
-  for (std::list<QualityInfo*>::iterator it = qualityList.begin(); it != qualityList.end(); it++)
-    delete *it;
+    for (auto it = qualityList.begin(); it != qualityList.end(); ++it)
+        delete *it;
 }
 
 void EncodeManager::logStats()
