@@ -334,13 +334,9 @@ public:
         av_packet_unref_f(pkt);
     }
 
-    void avcodec_flush_buffers(AVCodecContext *avctx) const {
-        avcodec_flush_buffers_f(avctx);
-    }
+    void avcodec_flush_buffers(AVCodecContext *avctx) const { avcodec_flush_buffers_f(avctx); }
 
-    int avcodec_close(AVCodecContext *avctx) const {
-        return avcodec_close_f(avctx);
-    }
+    int avcodec_close(AVCodecContext *avctx) const { return avcodec_close_f(avctx); }
 
     DEFINE_GUARD(Frame, AVFrame)
     DEFINE_GUARD(Packet, AVPacket)

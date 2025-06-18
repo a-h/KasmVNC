@@ -44,7 +44,8 @@
 #include <rfb/TightQOIEncoder.h>
 #include <execution>
 #include <tbb/parallel_for.h>
-#include <rfb/KasmVideoEncoder.h>
+#include "encoders/VideoEncoder.h"
+#include "encoders/VideoEncoderFactory.h"
 
 using namespace rfb;
 
@@ -55,14 +56,14 @@ static LogWriter vlog("EncodeManager");
 
 // Split each rectangle into smaller ones no larger than this area,
 // and no wider than this width.
-static const int SubRectMaxArea = 65536;
-static const int SubRectMaxWidth = 2048;
+static constexpr int SubRectMaxArea = 65536;
+static constexpr int SubRectMaxWidth = 2048;
 
 // The size in pixels of either side of each block tested when looking
 // for solid blocks.
-static const int SolidSearchBlock = 16;
+static constexpr int SolidSearchBlock = 16;
 // Don't bother with blocks smaller than this
-static const int SolidBlockMinArea = 2048;
+static constexpr int SolidBlockMinArea = 2048;
 
 namespace rfb {
 
@@ -180,7 +181,7 @@ EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_) :
     encoders[encoderTightQOI] = new TightQOIEncoder(conn);
     encoders[encoderZRLE] = new ZRLEEncoder(conn);
 
-    encoders[encoderKasmVideo] = new H264SoftwareEncoder(conn, Server::frameRate, Server::videoBitrate);
+    encoders[encoderKasmVideo] = create_encoder(video_encoders::best_encoder, conn, Server::frameRate, Server::videoBitrate);
 
     webpBenchResult = ((TightWEBPEncoder *) encoders[encoderTightWEBP])->benchmark();
     vlog.info("WEBP benchmark result: %u ms", webpBenchResult);
@@ -1463,9 +1464,10 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb,
       jpegstats.area += rect.area();
       jpegstats.rects++;
     }
-  } else if (type == encoderFullColour && activeEncoders[encoderFullColour] == encoderKasmVideo) {
-    ((KasmVideoEncoder *) encoders[encoderKasmVideo])->writeSkipRect();
-  } else {
+    } else if (type == encoderFullColour && activeEncoders[encoderFullColour] == encoderKasmVideo) {
+        if (auto *video_encoder = dynamic_cast<VideoEncoder*>(encoders[encoderKasmVideo]); video_encoder)
+            video_encoder->writeSkipRect();
+    } else {
     if (encoder->flags & EncoderUseNativePF) {
       ppb = preparePixelBuffer(rect, pb, false);
     } else {

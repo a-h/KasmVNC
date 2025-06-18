@@ -1,0 +1,199 @@
+#include "H264VAAPIEncoder.h"
+
+#include <fmt/format.h>
+#include "rfb/LogWriter.h"
+
+extern "C" {
+#include <libavutil/opt.h>
+}
+
+#include "KasmVideoConstants.h"
+#include "rfb/encodings.h"
+
+static rfb::LogWriter vlog("H264VAAPIEncoder");
+
+namespace rfb {
+
+
+    H264VAAPIEncoder::H264VAAPIEncoder(FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
+        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
+        frame_rate(frame_rate_), bit_rate(bit_rate_) {
+        AVBufferRef *hw_device_ctx{};
+        int err{};
+
+        // TODO: change render_path to nullptr
+        if (err = ffmpeg.av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, render_path, nullptr, 0); err < 0) {
+            throw std::runtime_error(fmt::format("Failed to create VAAPI device context {}", ffmpeg.get_error_description(err)));
+        }
+
+        hw_device_ctx_guard.reset(hw_device_ctx);
+        codec = ffmpeg.avcodec_find_encoder_by_name("h264_vaapi");
+        if (!codec)
+            throw std::runtime_error("Could not find H264 encoder");
+
+        auto *ctx = ffmpeg.avcodec_alloc_context3(codec);
+        if (!ctx)
+            throw std::runtime_error("Cannot allocate AVCodecContext");
+        ctx_guard.reset(ctx);
+
+        auto *frame = ffmpeg.av_frame_alloc();
+        if (!frame) {
+            throw std::runtime_error("Cannot allocate AVFrame");
+        }
+        sw_frame_guard.reset(frame);
+
+        ctx->time_base = {1, frame_rate};
+        ctx->framerate = {frame_rate, 1};
+        ctx->gop_size = GroupOfPictureSize; // interval between I-frames
+        ctx->max_b_frames = 0; // No B-frames for immediate output
+        ctx->pix_fmt = AV_PIX_FMT_VAAPI;
+
+        auto *hw_frames_ctx = ffmpeg.av_hwframe_ctx_alloc(hw_device_ctx);
+        if (!hw_frames_ctx)
+            throw std::runtime_error("Failed to create VAAPI frame context");
+        hw_frames_ref_guard.reset(hw_frames_ctx);
+
+        frame = ffmpeg.av_frame_alloc();
+        if (!frame)
+            throw std::runtime_error("Cannot allocate hw AVFrame");
+        hw_frame_guard.reset(frame);
+        // Force IDR for specific encoders (e.g., libx264)
+        // av_opt_set(ctx->priv_data, "forced-idr", "1", 0);
+
+        auto *pkt = ffmpeg.av_packet_alloc();
+        if (!pkt) {
+            throw std::runtime_error("Could not allocate packet");
+        }
+        pkt_guard.reset(pkt);
+    }
+
+    void H264VAAPIEncoder::write_compact(rdr::OutStream *os, int value) {
+        auto b = value & 0x7F;
+        if (value <= 0x7F) {
+            os->writeU8(b);
+        } else {
+            os->writeU8(b | 0x80);
+            b = value >> 7 & 0x7F;
+            if (value <= 0x3FFF) {
+                os->writeU8(b);
+            } else {
+                os->writeU8(b | 0x80);
+                os->writeU8(value >> 14 & 0xFF);
+            }
+        }
+    }
+
+    void H264VAAPIEncoder::init(int width, int height) {
+        AVHWFramesContext *frames_ctx{};
+        int err{};
+
+        auto *hw_frames_ref = hw_frames_ref_guard.get();
+
+        frames_ctx = reinterpret_cast<AVHWFramesContext *>(hw_frames_ref->data);
+        frames_ctx->format = AV_PIX_FMT_VAAPI;
+        frames_ctx->sw_format = AV_PIX_FMT_NV12;
+        frames_ctx->width = width;
+        frames_ctx->height = height;
+        frames_ctx->initial_pool_size = 20;
+        if ((err = ffmpeg.av_hwframe_ctx_init(hw_frames_ref)) < 0)
+            throw std::runtime_error(fmt::format("Failed to initialize VAAPI frame context: {}", ffmpeg.get_error_description(err)));
+
+        ctx_guard->hw_frames_ctx = ffmpeg.av_buffer_ref(hw_frames_ref);
+        if (!ctx_guard->hw_frames_ctx)
+            throw std::runtime_error("Failed to create buffer reference");
+
+        ctx_guard->width = width;
+        ctx_guard->height = height;
+
+        if (err = ffmpeg.avcodec_open2(ctx_guard.get(), codec, nullptr); err < 0)
+            throw std::runtime_error(fmt::format("Failed to open codec: {}", ffmpeg.get_error_description(err)));
+
+        auto *sws_ctx = ffmpeg.sws_getContext(
+                width, height, AV_PIX_FMT_RGB24, width, height, AV_PIX_FMT_NV12, SWS_BILINEAR, nullptr, nullptr, nullptr);
+
+        sws_guard.reset(sws_ctx);
+
+        ctx_guard->width = width;
+        ctx_guard->height = height;
+
+        auto *frame = sw_frame_guard.get();
+        frame->format = AV_PIX_FMT_NV12;
+        frame->width = width;
+        frame->height = height;
+
+        if (ffmpeg.av_frame_get_buffer(frame, 0) < 0)
+            throw std::runtime_error("Could not allocate sw-frame data");
+
+        if (err = ffmpeg.av_hwframe_get_buffer(ctx_guard->hw_frames_ctx, hw_frame_guard.get(), 0); err < 0)
+            throw std::runtime_error(fmt::format("Could not allocate hw-frame data: {}", ffmpeg.get_error_description(err)));
+    }
+
+    bool H264VAAPIEncoder::isSupported() {
+        return conn->cp.supportsEncoding(encodingKasmVideo);
+    }
+
+    void H264VAAPIEncoder::writeRect(const PixelBuffer *pb, const Palette &palette) {
+        // compress
+        int stride;
+        const auto rect = pb->getRect();
+        const auto *buffer = pb->getBuffer(rect, &stride);
+
+        const int width = rect.width();
+        const int height = rect.height();
+        auto *frame = sw_frame_guard.get();
+
+        const bool is_keyframe = frame->width != static_cast<int>(width) || frame->height != static_cast<int>(height);
+        if (is_keyframe)
+            init(width, height);
+
+        frame->key_frame = is_keyframe;
+
+        const uint8_t *src_data[1] = {buffer};
+        const int src_line_size[1] = {width * 3}; // RGB has 3 bytes per pixel
+
+        // TODO:  fix return
+        int err{};
+        ffmpeg.sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize);
+
+        if (err = ffmpeg.av_hwframe_transfer_data(hw_frame_guard.get(), frame, 0); err < 0)
+            throw std::runtime_error(fmt::format("Error while transferring frame data to surface: {}", ffmpeg.get_error_description(err)));
+
+        if (err = ffmpeg.avcodec_send_frame(ctx_guard.get(), hw_frame_guard.get()); err < 0) {
+            vlog.error("Error sending frame to codec (%s). Error code: %d", ffmpeg.get_error_description(err).c_str(), err);
+            return;
+        }
+
+        auto *pkt = pkt_guard.get();
+
+        err = ffmpeg.avcodec_receive_packet(ctx_guard.get(), pkt);
+        if (err == AVERROR(EAGAIN) || err == AVERROR_EOF) {
+            // Trying again
+            ffmpeg.avcodec_send_frame(ctx_guard.get(), hw_frame_guard.get());
+            err = ffmpeg.avcodec_receive_packet(ctx_guard.get(), pkt);
+        }
+
+        if (err < 0) {
+            vlog.error("Error receiving packet from codec");
+            return;
+        }
+
+        if (pkt->flags & AV_PKT_FLAG_KEY)
+            vlog.debug("Key frame %ld", frame->pts);
+
+        auto *os = conn->getOutStream(conn->cp.supportsUdp);
+        os->writeU8(kasmVideoH264 << 4);
+        write_compact(os, pkt->size + 1);
+        os->writeBytes(&pkt->data[0], pkt->size);
+        vlog.debug("Frame size:  %d", pkt->size);
+
+        ++frame->pts;
+        ffmpeg.av_packet_unref(pkt);
+    }
+
+    void H264VAAPIEncoder::writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) {}
+
+    void H264VAAPIEncoder::writeSkipRect() {
+        auto *os = conn->getOutStream(conn->cp.supportsUdp);
+        os->writeU8(kasmVideoSkip << 4);
+    }
+} // namespace rfb
