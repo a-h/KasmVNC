@@ -43,7 +43,7 @@ namespace rfb {
   public:
     Encoder(SConnection* conn, int encoding,
             enum EncoderFlags flags, unsigned int maxPaletteSize);
-    virtual ~Encoder();
+    virtual ~Encoder() = default;
 
     // isSupported() should return a boolean indicating if this encoder
     // is okay to use with the current connection. This usually involves
