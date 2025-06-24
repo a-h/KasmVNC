@@ -77,7 +77,8 @@
 #include <unistd.h>
 #include <wordexp.h>
 
-#include "KasmVideoConstants.h"
+#include <fmt/core.h>
+#include "encoders/KasmVideoConstants.h"
 
 using namespace rfb;
 
@@ -239,8 +240,8 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
     if (watermarkData)
         sendWatermark = true;
 
-    if (VideoEncoders::to_string(VideoEncoders::Codecs::H264) != Server::videoCodec.getValueStr())
-        throw std::invalid_argument(std::format("Unknown test videoCodec {}", Server::videoCodec.getValueStr()));
+    if (SupportedVideoEncoders::to_string(SupportedVideoEncoders::Codecs::H264) != Server::videoCodec.getValueStr())
+        throw std::invalid_argument(fmt::format("Unknown test videoCodec {}", Server::videoCodec.getValueStr()));
 
     if (Server::selfBench)
         SelfBench();

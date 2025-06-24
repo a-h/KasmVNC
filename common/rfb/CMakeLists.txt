@@ -136,8 +136,9 @@ endif ()
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale)
+pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale libva)
 pkg_check_modules(CPUID REQUIRED libcpuid)
+pkg_check_modules(FMT REQUIRED fmt)
 
 find_package(TBB)
 if (TBB_FOUND)
@@ -160,7 +161,7 @@ target_include_directories(rfb PRIVATE
         ${CPUID_INCLUDE_DIRS}
 )
 
-target_link_libraries(rfb PUBLIC ${RFB_LIBRARIES} tinyxml2_objs ${TBB_LIBRARIES} ${CPUID_LIBRARIES})
+target_link_libraries(rfb PUBLIC ${RFB_LIBRARIES} tinyxml2_objs ${TBB_LIBRARIES} ${FFMPEG_LIBRARIES} ${CPUID_LIBRARIES} ${FMT_LIBRARIES})
 
 if (UNIX)
     libtool_create_control_file(rfb)

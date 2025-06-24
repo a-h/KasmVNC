@@ -68,7 +68,8 @@ RUN \
     xorg-server-common \
     xorg-server-dev \
     xtrans \
-    ffmpeg-dev
+    ffmpeg-dev \
+    libva-dev
 
 
 ENV SCRIPTS_DIR=/tmp/scripts

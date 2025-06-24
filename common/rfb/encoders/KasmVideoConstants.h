@@ -17,9 +17,9 @@
  */
 #pragma once
 
-#include <string_view>
 #include <array>
-#include <fcntl.h>
+#include <cstdint>
+#include <string_view>
 
 namespace rfb {
     // Compression control
@@ -28,24 +28,9 @@ namespace rfb {
 
     static constexpr int GroupOfPictureSize = 10; // interval between I-frames
 
-    static auto render_path = "/dev/dri/renderD128";
+    inline const char *render_path = "/dev/dri/renderD128";
 
-    inline bool is_acceleration_available() {
-        if (access(render_path, R_OK | W_OK) != 0)
-            return false;
-
-        const int fd = open(render_path, O_RDWR);
-        if (fd < 0)
-            return false;
-
-        close(fd);
-
-        return true;
-    }
-
-    inline static bool hw_accel = is_acceleration_available();
-
-    struct VideoEncoders {
+    struct SupportedVideoEncoders {
         enum class Codecs : uint8_t
         {
             H264
@@ -57,4 +42,21 @@ namespace rfb {
             return CodecNames[static_cast<uint8_t>(codec)];
         }
     };
+
+    struct KasmVideoEncoders {
+        enum class Encoder : uint8_t
+        {
+            h264_vaapi,
+            h264_nvenc,
+            h264_software
+        };
+
+        static inline std::array<std::string_view, 3> EncoderNames = {"h264_vaapi", "h264_nvenc", "libx264"};
+
+        static std::string_view to_string(Encoder encoder) {
+            return EncoderNames[static_cast<uint8_t>(encoder)];
+        }
+    };
+
+
 } // namespace rfb
