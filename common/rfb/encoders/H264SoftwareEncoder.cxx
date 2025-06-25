@@ -13,20 +13,20 @@ extern "C" {
 static rfb::LogWriter vlog("H264SoftwareEncoder");
 
 namespace rfb {
-    H264SoftwareEncoder::H264SoftwareEncoder(SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
-        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1),
+    H264SoftwareEncoder::H264SoftwareEncoder(FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
+        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
         frame_rate(frame_rate_), bit_rate(bit_rate_) {
-        codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+        codec = ffmpeg.avcodec_find_encoder(AV_CODEC_ID_H264);
         if (!codec)
             throw std::runtime_error("Could not find H264 encoder");
 
-        auto *ctx = avcodec_alloc_context3(codec);
+        auto *ctx = ffmpeg.avcodec_alloc_context3(codec);
         if (!ctx) {
             throw std::runtime_error("Cannot allocate AVCodecContext");
         }
         ctx_guard.reset(ctx);
 
-        auto *frame = av_frame_alloc();
+        auto *frame = ffmpeg.av_frame_alloc();
         if (!frame) {
             throw std::runtime_error("Cannot allocate AVFrame");
         }
@@ -38,10 +38,12 @@ namespace rfb {
         ctx->pix_fmt = AV_PIX_FMT_YUV420P;
         ctx->max_b_frames = 0; // No B-frames for immediate output
 
-        av_opt_set(ctx->priv_data, "tune", "zerolatency", 0);
-        av_opt_set(ctx->priv_data, "preset", "ultrafast", 0);
+        if (ffmpeg.av_opt_set(ctx->priv_data, "tune", "zerolatency", 0) != 0)
+            throw std::runtime_error("Could not set codec setting");
+        if (ffmpeg.av_opt_set(ctx->priv_data, "preset", "ultrafast", 0) != 0)
+            throw std::runtime_error("Could not set codec setting");
 
-        auto *pkt = av_packet_alloc();
+        auto *pkt = ffmpeg.av_packet_alloc();
         if (!pkt)
             throw std::runtime_error("Could not allocate packet");
 
@@ -62,9 +64,18 @@ namespace rfb {
         const int height = rect.height();
         auto *frame = frame_guard.get();
 
-        const bool is_keyframe = frame->width != static_cast<int>(width) || frame->height != static_cast<int>(height);
+        int dst_width = width;
+        int dst_height = height;
+
+        if (width % 2 != 0)
+            dst_width = width & ~1;
+
+        if (height % 2 != 0)
+            dst_height = height & ~1;
+
+        const bool is_keyframe = frame->width != dst_width || frame->height != dst_height;
         if (is_keyframe)
-            init(width, height);
+            init(width, height, dst_width, dst_height);
 
         frame->key_frame = is_keyframe;
 
@@ -72,9 +83,9 @@ namespace rfb {
         const int src_line_size[1] = {width * 3}; // RGB has 3 bytes per pixel
 
         // TODO:  fix return
-        sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize);
+        ffmpeg.sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize);
 
-        int ret = avcodec_send_frame(ctx_guard.get(), frame);
+        int ret = ffmpeg.avcodec_send_frame(ctx_guard.get(), frame);
         if (ret < 0) {
             vlog.error("Error sending frame to codec");
             return;
@@ -82,10 +93,10 @@ namespace rfb {
 
         auto *pkt = pkt_guard.get();
 
-        ret = avcodec_receive_packet(ctx_guard.get(), pkt);
+        ret = ffmpeg.avcodec_receive_packet(ctx_guard.get(), pkt);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
             // Trying one more time
-            ret = avcodec_receive_packet(ctx_guard.get(), pkt);
+            ret = ffmpeg.avcodec_receive_packet(ctx_guard.get(), pkt);
         }
 
         if (ret < 0) {
@@ -94,7 +105,7 @@ namespace rfb {
         }
 
         if (pkt->flags & AV_PKT_FLAG_KEY)
-            vlog.info("Key frame %ld", frame->pts);
+            vlog.debug("Key frame %ld", frame->pts);
 
         auto *os = conn->getOutStream(conn->cp.supportsUdp);
         os->writeU8(kasmVideoH264 << 4);
@@ -102,7 +113,7 @@ namespace rfb {
         os->writeBytes(&pkt->data[0], pkt->size);
 
         ++frame->pts;
-        av_packet_unref(pkt);
+        ffmpeg.av_packet_unref(pkt);
     }
 
     void H264SoftwareEncoder::writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) {}
@@ -128,33 +139,33 @@ namespace rfb {
         }
     }
 
-    void H264SoftwareEncoder::init(int width, int height) {
-        auto *sws_ctx = sws_getContext(width,
-                                       height,
-                                       AV_PIX_FMT_RGB24,
-                                       width,
-                                       height,
-                                       AV_PIX_FMT_YUV420P,
-                                       SWS_BILINEAR,
-                                       nullptr,
-                                       nullptr,
-                                       nullptr);
+    void H264SoftwareEncoder::init(int src_width, int src_height, int dst_width, int dst_height) {
+        auto *sws_ctx = ffmpeg.sws_getContext(src_width,
+                                              src_height,
+                                              AV_PIX_FMT_RGB24,
+                                              dst_width,
+                                              dst_height,
+                                              AV_PIX_FMT_YUV420P,
+                                              SWS_BILINEAR,
+                                              nullptr,
+                                              nullptr,
+                                              nullptr);
 
         sws_guard.reset(sws_ctx);
 
-        ctx_guard->width = width;
-        ctx_guard->height = height;
+        ctx_guard->width = dst_width;
+        ctx_guard->height = dst_height;
 
         auto *frame = frame_guard.get();
         frame->format = ctx_guard->pix_fmt;
-        frame->width = width;
-        frame->height = height;
+        frame->width = dst_width;
+        frame->height = dst_height;
 
-        if (av_frame_get_buffer(frame, 0) < 0) {
+        if (ffmpeg.av_frame_get_buffer(frame, 0) < 0) {
             throw std::runtime_error("Could not allocate frame data");
         }
 
-        if (avcodec_open2(ctx_guard.get(), codec, nullptr) < 0) {
+        if (ffmpeg.avcodec_open2(ctx_guard.get(), codec, nullptr) < 0) {
             throw std::runtime_error("Failed to open codec");
         }
     }
