@@ -34,15 +34,15 @@
 #include <rfb/Exception.h>
 #include <rfb/Watermark.h>
 
-#include <rfb/RawEncoder.h>
-#include <rfb/RREEncoder.h>
+#include <execution>
 #include <rfb/HextileEncoder.h>
-#include <rfb/ZRLEEncoder.h>
+#include <rfb/RREEncoder.h>
+#include <rfb/RawEncoder.h>
 #include <rfb/TightEncoder.h>
 #include <rfb/TightJPEGEncoder.h>
-#include <rfb/TightWEBPEncoder.h>
 #include <rfb/TightQOIEncoder.h>
-#include <execution>
+#include <rfb/TightWEBPEncoder.h>
+#include <rfb/ZRLEEncoder.h>
 #include <tbb/parallel_for.h>
 #include "encoders/VideoEncoder.h"
 #include "encoders/VideoEncoderFactory.h"
@@ -165,9 +165,9 @@ static void updateMaxVideoRes(uint16_t *x, uint16_t *y) {
   }
 }
 
-EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_) :
+EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmpeg& ffmpeg) :
     conn(conn_), dynamicQualityMin(-1), dynamicQualityOff(-1), areaCur(0), videoDetected(false), videoTimer(this),
-    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), encCache(encCache_)
+    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), ffmpeg_available(ffmpeg.is_available()), encCache(encCache_)
 {
     encoders.resize(encoderClassMax, nullptr);
     activeEncoders.resize(encoderTypeMax, encoderRaw);
@@ -181,7 +181,10 @@ EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_) :
     encoders[encoderTightQOI] = new TightQOIEncoder(conn);
     encoders[encoderZRLE] = new ZRLEEncoder(conn);
 
-    encoders[encoderKasmVideo] = create_encoder(video_encoders::best_encoder, conn, Server::frameRate, Server::videoBitrate);
+    if (ffmpeg_available)
+        encoders[encoderKasmVideo] = create_encoder(ffmpeg, video_encoders::best_encoder, conn, Server::frameRate, Server::videoBitrate);
+
+    video_mode_available = ffmpeg_available && Server::videoCodec[0];
 
     webpBenchResult = ((TightWEBPEncoder *) encoders[encoderTightWEBP])->benchmark();
     vlog.info("WEBP benchmark result: %u ms", webpBenchResult);
@@ -424,25 +427,33 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     writeCopyPassRects(copypassed);
 
     // If a video codec is enabled, send that stream constantly
-    if (Server::videoCodec[0]) {
-      startRect(pb->getRect(), encoderFullColour, true, STARTRECT_OVERRIDE_KASMVIDEO);
+    /*if (ffmpeg_available && video_mode_available) {
+         startRect(pb->getRect(), encoderFullColour, true, STARTRECT_OVERRIDE_KASMVIDEO);
 
-      encoders[encoderKasmVideo]->writeRect(pb, Palette());
+         encoders[encoderKasmVideo]->writeRect(pb, Palette());
 
-      endRect(STARTRECT_OVERRIDE_KASMVIDEO);
+         endRect(STARTRECT_OVERRIDE_KASMVIDEO);
+     }*/
+
+    if (videoDetected) {
+        auto *encoder = startRect(pb->getRect(), encoderFullColour, true, STARTRECT_OVERRIDE_KASMVIDEO);
+        encoder->writeRect(pb, Palette());
+        endRect(STARTRECT_OVERRIDE_KASMVIDEO);
+        std::vector<Rect> rects;
+        changed.get_rects(&rects);
+        updateVideoStats(rects, pb);
+    } else {
+        /*
+         * We start by searching for solid rects, which are then removed
+         * from the changed region.
+         */
+        if (conn->cp.supportsLastRect && !conn->cp.supportsQOI)
+            writeSolidRects(&changed, pb);
+
+        writeRects(changed, pb, &start, true);
+        if (!videoDetected) // In case detection happened between the calls
+            writeRects(cursorRegion, renderedCursor);
     }
-
-    /*
-     * We start by searching for solid rects, which are then removed
-     * from the changed region.
-     */
-    if (conn->cp.supportsLastRect && !conn->cp.supportsQOI)
-      writeSolidRects(&changed, pb);
-
-    writeRects(changed, pb,
-               &start, true);
-    if (!videoDetected) // In case detection happened between the calls
-      writeRects(cursorRegion, renderedCursor);
 
     if (watermarkData && conn->sendWatermark()) {
       beforeLength = conn->getOutStream(conn->cp.supportsUdp)->length();
@@ -647,7 +658,7 @@ int EncodeManager::computeNumRects(const Region& changed)
 
     // No split necessary?
     if ((((w*h) < SubRectMaxArea) && (w < SubRectMaxWidth)) ||
-        (videoDetected && !Server::videoCodec[0] && !encoders[encoderTightWEBP]->isSupported())) {
+        (videoDetected && !video_mode_available && !encoders[encoderTightWEBP]->isSupported())) {
       numRects += 1;
       continue;
     }
@@ -711,15 +722,16 @@ void EncodeManager::endRect(const enum startRectOverride overrider)
   int length;
 
   conn->writer()->endRect();
+    conn->writer()->endRect();
+    const auto length = conn->getOutStream(conn->cp.supportsUdp)->length() - beforeLength;
+    auto klass = activeEncoders[activeType];
 
-  length = conn->getOutStream(conn->cp.supportsUdp)->length() - beforeLength;
+    if (overrider == STARTRECT_OVERRIDE_WEBP)
+        klass = encoderTightWEBP;
+    else if (overrider == STARTRECT_OVERRIDE_KASMVIDEO)
+        klass = encoderKasmVideo;
 
-  klass = activeEncoders[activeType];
-  if (overrider == STARTRECT_OVERRIDE_WEBP)
-    klass = encoderTightWEBP;
-  else if (overrider == STARTRECT_OVERRIDE_KASMVIDEO)
-    klass = encoderKasmVideo;
-  stats[klass][activeType].bytes += length;
+    stats[klass][activeType].bytes += length;
 }
 
 void EncodeManager::writeCopyPassRects(const std::vector<CopyPassRect>& copypassed)
@@ -1142,7 +1154,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
     updateVideoStats(rects, pb);
   }
 
-  if (videoDetected && !Server::videoCodec[0]) {
+  if (videoDetected && !video_mode_available) {
     rects.clear();
     rects.push_back(pb->getRect());
   }
@@ -1158,7 +1170,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
 
     // No split necessary?
     if ((((w*h) < SubRectMaxArea) && (w < SubRectMaxWidth)) ||
-        (videoDetected && !Server::videoCodec[0] && !encoders[encoderTightWEBP]->isSupported())) {
+        (videoDetected && !video_mode_available && !encoders[encoderTightWEBP]->isSupported())) {
       subrects.push_back(rect);
       trackRectQuality(rect);
       continue;
@@ -1203,7 +1215,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
   gettimeofday(&scalestart, NULL);
 
   const PixelBuffer *scaledpb = NULL;
-  if (videoDetected && !Server::videoCodec[0] &&
+  if (videoDetected && !video_mode_available &&
       (maxVideoX < pb->getRect().width() || maxVideoY < pb->getRect().height())) {
     const float xdiff = maxVideoX / (float) pb->getRect().width();
     const float ydiff = maxVideoY / (float) pb->getRect().height();
@@ -1290,8 +1302,8 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
 
   if (webpTookTooLong.load(std::memory_order_relaxed))
     activeEncoders[encoderFullColour] = encoderTightJPEG;
-  if (videoDetected && Server::videoCodec[0])
-    activeEncoders[encoderFullColour] = encoderKasmVideo;
+  //if (ffmpeg_available && videoDetected && video_mode_available)
+  //  activeEncoders[encoderFullColour] = encoderKasmVideo;
 
   for (uint32_t i = 0; i < subrects_size; ++i) {
     if (encCache->enabled && !compresseds[i].empty() && !fromCache[i] &&
@@ -1375,7 +1387,7 @@ uint8_t EncodeManager::getEncoderType(const Rect& rect, const PixelBuffer *pb,
     struct timeval start;
     gettimeofday(&start, NULL);
 
-    if (videoDetected && Server::videoCodec[0]) {
+    if (encCache && video_mode_available) {
       // nop, send this as a skip rect
     } else if (encCache->enabled &&
         (data = encCache->get(activeEncoders[encoderFullColour],

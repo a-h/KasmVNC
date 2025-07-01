@@ -12,16 +12,16 @@ namespace rfb {
 
     template<typename T>
     class H264EncoderBuilder : public EncoderBuilder {
-        FFmpeg &ffmpeg;
+        const FFmpeg &ffmpeg;
         int frame_rate{};
         int bit_rate{};
         SConnection *conn{};
-        explicit H264EncoderBuilder(FFmpeg &ffmpeg_) : ffmpeg(ffmpeg_) {}
+        explicit H264EncoderBuilder(const FFmpeg &ffmpeg_) : ffmpeg(ffmpeg_) {}
 
     public:
         H264EncoderBuilder() = delete;
 
-        static H264EncoderBuilder create(FFmpeg &ffmpeg) {
+        static H264EncoderBuilder create(const FFmpeg &ffmpeg) {
             return H264EncoderBuilder{ffmpeg};
         }
 
@@ -54,16 +54,16 @@ namespace rfb {
     using H264VAAPIEncoderBuilder = H264EncoderBuilder<H264VAAPIEncoder>;
     using H264SoftwareEncoderBuilder = H264EncoderBuilder<H264SoftwareEncoder>;
 
-    Encoder *create_encoder(KasmVideoEncoders::Encoder video_encoder, SConnection *conn, uint8_t frame_rate, uint16_t bit_rate) {
+    Encoder *create_encoder(const FFmpeg &ffmpeg, KasmVideoEncoders::Encoder video_encoder, SConnection *conn, uint8_t frame_rate, uint16_t bit_rate) {
         switch (video_encoder) {
             case KasmVideoEncoders::Encoder::h264_vaapi:
-                return H264VAAPIEncoderBuilder::create(FFmpeg::get())
+                return H264VAAPIEncoderBuilder::create(ffmpeg)
                         .with_connection(conn)
                         .with_frame_rate(frame_rate)
                         .with_bit_rate(bit_rate)
                         .build();
             default:
-                return H264SoftwareEncoderBuilder::create(FFmpeg::get())
+                return H264SoftwareEncoderBuilder::create(ffmpeg)
                         .with_connection(conn)
                         .with_frame_rate(frame_rate)
                         .with_bit_rate(bit_rate)

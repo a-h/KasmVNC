@@ -56,70 +56,80 @@ FFmpeg::FFmpeg() {
     };
 
     // libavformat
-    libavformat = load_lib("libavformat.so");
-    auto handle = libavformat.get();
+    try {
+        libavformat = load_lib("libavformat.so");
+        auto handle = libavformat.get();
 
-    avformat_open_input_f = D_LOOKUP_SYM(handle, avformat_open_input);
-    avformat_find_stream_info_f = D_LOOKUP_SYM(handle, avformat_find_stream_info);
-    avcodec_find_decoder_f = D_LOOKUP_SYM(handle, avcodec_find_decoder);
-    avcodec_parameters_to_context_f = D_LOOKUP_SYM(handle, avcodec_parameters_to_context);
-    av_read_frame_f = D_LOOKUP_SYM(handle, av_read_frame);
-    av_seek_frame_f = D_LOOKUP_SYM(handle, av_seek_frame);
-    avformat_close_input_f = D_LOOKUP_SYM(handle, avformat_close_input);
+        avformat_open_input_f = D_LOOKUP_SYM(handle, avformat_open_input);
+        avformat_find_stream_info_f = D_LOOKUP_SYM(handle, avformat_find_stream_info);
+        avcodec_find_decoder_f = D_LOOKUP_SYM(handle, avcodec_find_decoder);
+        avcodec_parameters_to_context_f = D_LOOKUP_SYM(handle, avcodec_parameters_to_context);
+        av_read_frame_f = D_LOOKUP_SYM(handle, av_read_frame);
+        av_seek_frame_f = D_LOOKUP_SYM(handle, av_seek_frame);
+        avformat_close_input_f = D_LOOKUP_SYM(handle, avformat_close_input);
 
-    vlog.info("libavformat.so loaded");
+        vlog.info("libavformat.so loaded");
 
-    // libavutil
-    libavutil = load_lib("libavutil.so");
-    handle = libavutil.get();
+        // libavutil
+        libavutil = load_lib("libavutil.so");
+        handle = libavutil.get();
 
-    av_frame_free_f = D_LOOKUP_SYM(handle, av_frame_free);
-    av_frame_alloc_f = D_LOOKUP_SYM(handle, av_frame_alloc);
-    av_frame_get_buffer_f = D_LOOKUP_SYM(handle, av_frame_get_buffer);
-    av_opt_set_f = D_LOOKUP_SYM(handle, av_opt_set);
-    av_buffer_unref_f = D_LOOKUP_SYM(handle, av_buffer_unref);
-    av_hwdevice_ctx_create_f = D_LOOKUP_SYM(handle, av_hwdevice_ctx_create);
-    av_hwframe_ctx_alloc_f = D_LOOKUP_SYM(handle, av_hwframe_ctx_alloc);
-    av_hwframe_ctx_init_f = D_LOOKUP_SYM(handle, av_hwframe_ctx_init);
-    av_buffer_ref_f = D_LOOKUP_SYM(handle, av_buffer_ref);
-    av_hwframe_get_buffer_f = D_LOOKUP_SYM(handle, av_hwframe_get_buffer);
-    av_hwframe_transfer_data_f = D_LOOKUP_SYM(handle, av_hwframe_transfer_data);
-    av_strerror_f = D_LOOKUP_SYM(handle, av_strerror);
-    av_log_set_level_f = D_LOOKUP_SYM(handle, av_log_set_level);
-    av_log_set_callback_f = D_LOOKUP_SYM(handle, av_log_set_callback);
+        av_frame_free_f = D_LOOKUP_SYM(handle, av_frame_free);
+        av_frame_alloc_f = D_LOOKUP_SYM(handle, av_frame_alloc);
+        av_frame_unref_f = D_LOOKUP_SYM(handle, av_frame_unref);
+        av_frame_get_buffer_f = D_LOOKUP_SYM(handle, av_frame_get_buffer);
+        av_opt_set_f = D_LOOKUP_SYM(handle, av_opt_set);
+        av_buffer_unref_f = D_LOOKUP_SYM(handle, av_buffer_unref);
+        av_hwdevice_ctx_create_f = D_LOOKUP_SYM(handle, av_hwdevice_ctx_create);
+        av_hwframe_ctx_alloc_f = D_LOOKUP_SYM(handle, av_hwframe_ctx_alloc);
+        av_hwframe_ctx_init_f = D_LOOKUP_SYM(handle, av_hwframe_ctx_init);
+        av_buffer_ref_f = D_LOOKUP_SYM(handle, av_buffer_ref);
+        av_hwframe_get_buffer_f = D_LOOKUP_SYM(handle, av_hwframe_get_buffer);
+        av_hwframe_transfer_data_f = D_LOOKUP_SYM(handle, av_hwframe_transfer_data);
+        av_strerror_f = D_LOOKUP_SYM(handle, av_strerror);
+        av_log_set_level_f = D_LOOKUP_SYM(handle, av_log_set_level);
+        av_log_set_callback_f = D_LOOKUP_SYM(handle, av_log_set_callback);
 
-    vlog.info("libavutil.so loaded");
+        vlog.info("libavutil.so loaded");
 
-    // libswscale
-    libswscale = load_lib("libswscale.so");
-    handle = libswscale.get();
+        // libswscale
+        libswscale = load_lib("libswscale.so");
+        handle = libswscale.get();
 
-    sws_freeContext_f = D_LOOKUP_SYM(handle, sws_freeContext);
-    sws_getContext_f = D_LOOKUP_SYM(handle, sws_getContext);
-    sws_scale_f = D_LOOKUP_SYM(handle, sws_scale);
+        sws_freeContext_f = D_LOOKUP_SYM(handle, sws_freeContext);
+        sws_getContext_f = D_LOOKUP_SYM(handle, sws_getContext);
+        sws_scale_f = D_LOOKUP_SYM(handle, sws_scale);
 
-    // libavcodec
-    libavcodec = load_lib("libavcodec.so");
-    handle = libavcodec.get();
+        // libavcodec
+        libavcodec = load_lib("libavcodec.so");
+        handle = libavcodec.get();
 
-    avcodec_free_context_f = D_LOOKUP_SYM(handle, avcodec_free_context);
-    avcodec_open2_f = D_LOOKUP_SYM(handle, avcodec_open2);
-    avcodec_find_encoder_f = D_LOOKUP_SYM(handle, avcodec_find_encoder);
-    avcodec_find_encoder_by_name_f = D_LOOKUP_SYM(handle, avcodec_find_encoder_by_name);
-    avcodec_alloc_context3_f = D_LOOKUP_SYM(handle, avcodec_alloc_context3);
-    avcodec_send_frame_f = D_LOOKUP_SYM(handle, avcodec_send_frame);
-    avcodec_send_packet_f = D_LOOKUP_SYM(handle, avcodec_send_packet);
-    avcodec_receive_frame_f = D_LOOKUP_SYM(handle, avcodec_receive_frame);
-    avcodec_receive_packet_f = D_LOOKUP_SYM(handle, avcodec_receive_packet);
-    av_packet_unref_f = D_LOOKUP_SYM(handle, av_packet_unref);
-    avcodec_flush_buffers_f = D_LOOKUP_SYM(handle, avcodec_flush_buffers);
-    avcodec_close_f = D_LOOKUP_SYM(handle, avcodec_close);
-    av_packet_alloc_f = D_LOOKUP_SYM(handle, av_packet_alloc);
-    av_packet_free_f = D_LOOKUP_SYM(handle, av_packet_free);
+        avcodec_free_context_f = D_LOOKUP_SYM(handle, avcodec_free_context);
+        avcodec_open2_f = D_LOOKUP_SYM(handle, avcodec_open2);
+        avcodec_find_encoder_f = D_LOOKUP_SYM(handle, avcodec_find_encoder);
+        avcodec_find_encoder_by_name_f = D_LOOKUP_SYM(handle, avcodec_find_encoder_by_name);
+        avcodec_alloc_context3_f = D_LOOKUP_SYM(handle, avcodec_alloc_context3);
+        avcodec_send_frame_f = D_LOOKUP_SYM(handle, avcodec_send_frame);
+        avcodec_send_packet_f = D_LOOKUP_SYM(handle, avcodec_send_packet);
+        avcodec_receive_frame_f = D_LOOKUP_SYM(handle, avcodec_receive_frame);
+        avcodec_receive_packet_f = D_LOOKUP_SYM(handle, avcodec_receive_packet);
+        av_packet_unref_f = D_LOOKUP_SYM(handle, av_packet_unref);
+        avcodec_flush_buffers_f = D_LOOKUP_SYM(handle, avcodec_flush_buffers);
+        avcodec_close_f = D_LOOKUP_SYM(handle, avcodec_close);
+        av_packet_alloc_f = D_LOOKUP_SYM(handle, av_packet_alloc);
+        av_packet_free_f = D_LOOKUP_SYM(handle, av_packet_free);
 
-    av_log_set_level_f(AV_LOG_VERBOSE); // control what is emitted
-    av_log_set_callback_f(av_log_callback);
+        av_log_set_level_f(AV_LOG_VERBOSE); // control what is emitted
+        av_log_set_callback_f(av_log_callback);
+
+        available = true;
+    } catch (std::exception &e) {
+        vlog.error("%s", e.what());
+
+        return;
+    }
 }
+
 void FFmpeg::av_log_callback(void *ptr, int level, const char *fmt, va_list vl) {
     if (level > AV_LOG_VERBOSE)
         return;

@@ -33,7 +33,8 @@
 #include <stdint.h>
 #include <atomic>
 #include <tbb/task_arena.h>
-#include <sys/time.h>
+
+#include "ffmpeg.h"
 
 enum startRectOverride {
   STARTRECT_NO_OVERRIDE,
@@ -56,7 +57,7 @@ namespace rfb {
 
   class EncodeManager: public Timer::Callback {
   public:
-    EncodeManager(SConnection* conn, EncCache *encCache);
+    EncodeManager(SConnection* conn, EncCache *encCache, const FFmpeg& ffmpeg);
     ~EncodeManager() override;
 
     void logStats();
@@ -212,6 +213,9 @@ namespace rfb {
     unsigned encodingTime;
     unsigned maxEncodingTime, framesSinceEncPrint;
     unsigned scalingTime;
+
+    bool ffmpeg_available;
+    bool video_mode_available{false};
 
     EncCache *encCache;
 

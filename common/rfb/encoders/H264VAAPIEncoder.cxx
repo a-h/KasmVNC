@@ -15,7 +15,7 @@ static rfb::LogWriter vlog("H264VAAPIEncoder");
 namespace rfb {
 
 
-    H264VAAPIEncoder::H264VAAPIEncoder(FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
+    H264VAAPIEncoder::H264VAAPIEncoder(const FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
         Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
         frame_rate(frame_rate_), bit_rate(bit_rate_) {
         AVBufferRef *hw_device_ctx{};

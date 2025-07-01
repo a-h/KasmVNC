@@ -93,6 +93,7 @@ class FFmpeg final {
     using av_frame_free_func = void (*)(AVFrame **);
     using av_frame_alloc_func = AVFrame *(*) ();
     using av_frame_get_buffer_func = int (*)(AVFrame *frame, int align);
+    using av_frame_unref_func = void (*)(AVFrame *frame);
     using av_opt_set_func = int (*)(void *obj, const char *name, const char *val, int search_flags);
     using av_buffer_unref_func = void (*)(AVBufferRef **);
     using av_hwdevice_ctx_create_func = int (*)(AVBufferRef **device_ctx, AVHWDeviceType type, const char *device, AVDictionary *opts,
@@ -151,6 +152,7 @@ class FFmpeg final {
     static inline av_frame_free_func av_frame_free_f{};
     av_frame_alloc_func av_frame_alloc_f{};
     av_frame_get_buffer_func av_frame_get_buffer_f{};
+    av_frame_unref_func av_frame_unref_f{};
     av_opt_set_func av_opt_set_f{};
     static inline av_buffer_unref_func av_buffer_unref_f{};
     av_hwdevice_ctx_create_func av_hwdevice_ctx_create_f{};
@@ -196,10 +198,16 @@ class FFmpeg final {
 
     static void av_log_callback(void *ptr, int level, const char *fmt, va_list vl);
 
+    bool available{};
+
 public:
-    static FFmpeg &get() {
+    [[nodiscard]] static FFmpeg &get() {
         static FFmpeg instance;
         return instance;
+    }
+
+    [[nodiscard]] bool is_available() const {
+        return available;
     }
 
     static void avformat_close_input(AVFormatContext **s) {
@@ -233,6 +241,10 @@ public:
 
     [[nodiscard]] int av_frame_get_buffer(AVFrame *frame, int align) const {
         return av_frame_get_buffer_f(frame, align);
+    }
+
+    void av_frame_unref(AVFrame *frame) const {
+        av_frame_unref_f(frame);
     }
 
     [[nodiscard]] int av_opt_set(void *obj, const char *name, const char *val, int search_flags) const {

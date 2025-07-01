@@ -140,7 +140,7 @@ namespace benchmarking {
         MockStream udps{};
 
         EncCache cache{};
-        EncodeManager manager{this, &cache};
+        EncodeManager manager{this, &cache, FFmpeg::get()};
     };
 
     class MockCConnection final : public MockTestConnection {
@@ -341,7 +341,11 @@ void report(std::vector<uint64_t> &totals, std::vector<uint64_t> &timings,
 void benchmark(std::string_view path, const std::string_view results_file) {
     try {
         vlog.info("Benchmarking with video file %s", path.data());
-        FfmpegFrameFeeder frame_feeder{&FFmpeg::get()};
+        auto &ffmpeg = FFmpeg::get();
+        if (!ffmpeg.is_available())
+            throw std::runtime_error("FFmpeg is not available");
+
+        FfmpegFrameFeeder frame_feeder{&ffmpeg};
         frame_feeder.open(path);
 
         static const rfb::PixelFormat pf{32, 24, false, true, 0xFF, 0xFF, 0xFF, 0, 8, 16};
