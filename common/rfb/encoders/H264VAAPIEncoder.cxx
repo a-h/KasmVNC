@@ -13,8 +13,6 @@ extern "C" {
 static rfb::LogWriter vlog("H264VAAPIEncoder");
 
 namespace rfb {
-
-
     H264VAAPIEncoder::H264VAAPIEncoder(const FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
         Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
         frame_rate(frame_rate_), bit_rate(bit_rate_) {
@@ -29,7 +27,7 @@ namespace rfb {
         hw_device_ctx_guard.reset(hw_device_ctx);
         codec = ffmpeg.avcodec_find_encoder_by_name("h264_vaapi");
         if (!codec)
-            throw std::runtime_error("Could not find H264 encoder");
+            throw std::runtime_error("Could not find h264_vaapi encoder");
 
         auto *ctx = ffmpeg.avcodec_alloc_context3(codec);
         if (!ctx)
@@ -57,8 +55,6 @@ namespace rfb {
         if (!frame)
             throw std::runtime_error("Cannot allocate hw AVFrame");
         hw_frame_guard.reset(frame);
-        // Force IDR for specific encoders (e.g., libx264)
-        // av_opt_set(ctx->priv_data, "forced-idr", "1", 0);
 
         auto *pkt = ffmpeg.av_packet_alloc();
         if (!pkt) {
@@ -157,8 +153,10 @@ namespace rfb {
             return;
         }
 
-        if (err = ffmpeg.av_hwframe_transfer_data(hw_frame_guard.get(), frame, 0); err < 0)
-            throw std::runtime_error(fmt::format("Error while transferring frame data to surface: {}", ffmpeg.get_error_description(err)));
+        if (err = ffmpeg.av_hwframe_transfer_data(hw_frame_guard.get(), frame, 0); err < 0) {
+            vlog.error(
+                    "Error while transferring frame data to surface (%s). Error code: %d", ffmpeg.get_error_description(err).c_str(), err);
+        }
 
         if (err = ffmpeg.avcodec_send_frame(ctx_guard.get(), hw_frame_guard.get()); err < 0) {
             vlog.error("Error sending frame to codec (%s). Error code: %d", ffmpeg.get_error_description(err).c_str(), err);
