@@ -110,8 +110,14 @@ FfmpegFrameFeeder::play_stats_t FfmpegFrameFeeder::play(benchmarking::MockTestCo
             if (ffmpeg->avcodec_send_packet(codec_ctx, packet.get()) == 0) {
                 while (ffmpeg->avcodec_receive_frame(codec_ctx, frame.get()) == 0) {
                     // Convert to RGB
-                    ffmpeg->sws_scale(
-                            sws_ctx_guard.get(), frame->data, frame->linesize, 0, frame->height, rgb_frame->data, rgb_frame->linesize);
+                    if (ffmpeg->sws_scale(sws_ctx_guard.get(),
+                                          frame->data,
+                                          frame->linesize,
+                                          0,
+                                          frame->height,
+                                          rgb_frame->data,
+                                          rgb_frame->linesize) < 0)
+                        throw std::runtime_error("Could not scale frame");
 
                     connection->framebufferUpdateStart();
                     connection->setNewFrame(rgb_frame.get());

@@ -82,8 +82,10 @@ namespace rfb {
         const uint8_t *src_data[1] = {buffer};
         const int src_line_size[1] = {width * 3}; // RGB has 3 bytes per pixel
 
-        // TODO:  fix return
-        ffmpeg.sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize);
+        if (ffmpeg.sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize) < 0) {
+            vlog.error("Error while scaling image");
+            return;
+        }
 
         int ret = ffmpeg.avcodec_send_frame(ctx_guard.get(), frame);
         if (ret < 0) {

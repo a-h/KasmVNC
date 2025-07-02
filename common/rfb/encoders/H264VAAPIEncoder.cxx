@@ -151,9 +151,11 @@ namespace rfb {
         const uint8_t *src_data[1] = {buffer};
         const int src_line_size[1] = {width * 3}; // RGB has 3 bytes per pixel
 
-        // TODO:  fix return
         int err{};
-        ffmpeg.sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize);
+        if (err = ffmpeg.sws_scale(sws_guard.get(), src_data, src_line_size, 0, height, frame->data, frame->linesize); err < 0) {
+            vlog.error("Error (%s) while scaling image. Error code: %d", ffmpeg.get_error_description(err).c_str(), err);
+            return;
+        }
 
         if (err = ffmpeg.av_hwframe_transfer_data(hw_frame_guard.get(), frame, 0); err < 0)
             throw std::runtime_error(fmt::format("Error while transferring frame data to surface: {}", ffmpeg.get_error_description(err)));
