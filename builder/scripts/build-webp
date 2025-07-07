@@ -27,7 +27,7 @@ build_and_install() {
   if [ "$ARCH" = "x86_64" ]; then
     CONFIG_FLAGS+=( --enable-sse2 )
   elif [ "$ARCH" = "aarch64" ]; then
-    CONFIG_FLAGS=( --enable-neon )
+    CONFIG_FLAGS+=( --enable-neon )
   else
     echo "Unsupported architecture: $ARCH" && exit 1;
   fi
