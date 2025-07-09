@@ -1,7 +1,7 @@
 ARG BASE_IMAGE
 FROM $BASE_IMAGE
 
-RUN apk add bash
+RUN apk add bash ffmpeg-dev
 
 ENV STARTUPDIR=/dockerstartup
 
