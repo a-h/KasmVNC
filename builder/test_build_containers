@@ -31,6 +31,9 @@ for file in "$script_dir"/dockerfile.*.build; do
     fi
 
     rm -rf .cmake CMakeFiles build.ninja cmake_install.cmake cmake_uninstall.cmake CMakeCache.txt config.h
+    rm -rf unix
+    git checkout HEAD -- unix/
+
 
     echo "Running container from image '$image_name'"
     # Run the container and capture the exit code
