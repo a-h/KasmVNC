@@ -344,7 +344,7 @@ static int vncPointerProc(DeviceIntPtr pDevice, int onoff)
 		float scrollFactorH = envScrollFactorH ? atof(envScrollFactorH) : 50.0;
 		float scrollFactorV = envScrollFactorV ? atof(envScrollFactorV) : 50.0;
 
-		LOG_INFO("Mouse horizonatl scroll factor: %f", scrollFactorH);
+		LOG_INFO("Mouse horizontal scroll factor: %f", scrollFactorH);
 		LOG_INFO("Mouse vertical scroll factor: %f", scrollFactorV);
 
         SetScrollValuator(pDevice, 2, SCROLL_TYPE_HORIZONTAL, scrollFactorH, SCROLL_FLAG_NONE);

@@ -718,10 +718,6 @@ Encoder *EncodeManager::startRect(const Rect& rect, int type, const bool trackQu
 
 void EncodeManager::endRect(const enum startRectOverride overrider)
 {
-  int klass;
-  int length;
-
-  conn->writer()->endRect();
     conn->writer()->endRect();
     const auto length = conn->getOutStream(conn->cp.supportsUdp)->length() - beforeLength;
     auto klass = activeEncoders[activeType];
@@ -937,10 +933,14 @@ void EncodeManager::updateVideoStats(const std::vector<Rect> &rects, const Pixel
     videoDetected = true;
     return;
   }
+    if (!rfb::Server::videoTime) {
+        videoDetected = true;
+        return;
+    }
 
   unsigned area = 0;
   const unsigned samples = rfb::Server::videoTime * rfb::Server::frameRate;
-  for (rect = rects.begin(); rect != rects.end(); ++rect) {
+  for (auto rect = rects.begin(); rect != rects.end(); ++rect) {
     area += rect->area();
   }
   area *= 100;
@@ -951,7 +951,7 @@ void EncodeManager::updateVideoStats(const std::vector<Rect> &rects, const Pixel
   areaCur %= samples;
 
   area = 0;
-  for (i = 0; i < samples; i++)
+  for (uint32_t i = 0; i < samples; i++)
     area += areaPercentages[i];
   area /= samples;
 
