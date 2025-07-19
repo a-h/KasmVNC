@@ -926,13 +926,6 @@ bool EncodeManager::handleTimeout(Timer* t)
 
 void EncodeManager::updateVideoStats(const std::vector<Rect> &rects, const PixelBuffer* pb)
 {
-  std::vector<Rect>::const_iterator rect;
-  uint32_t i;
-
-  if (!rfb::Server::videoTime) {
-    videoDetected = true;
-    return;
-  }
     if (!rfb::Server::videoTime) {
         videoDetected = true;
         return;
