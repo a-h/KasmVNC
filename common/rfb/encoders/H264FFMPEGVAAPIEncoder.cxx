@@ -1,6 +1,8 @@
-#include "H264VAAPIEncoder.h"
+#include "H264FFMPEGVAAPIEncoder.h"
 
 #include <fmt/format.h>
+
+#include "EncoderProbe.h"
 #include "rfb/LogWriter.h"
 
 extern "C" {
@@ -10,17 +12,16 @@ extern "C" {
 #include "KasmVideoConstants.h"
 #include "rfb/encodings.h"
 
-static rfb::LogWriter vlog("H264VAAPIEncoder");
+static rfb::LogWriter vlog("H264FFMPEGVAAPIEncoder");
 
 namespace rfb {
-    H264VAAPIEncoder::H264VAAPIEncoder(const FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
-        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
+    H264FFMPEGVAAPIEncoder::H264FFMPEGVAAPIEncoder(u_int32_t id, const FFmpeg &ffmpeg_, SConnection *conn, uint8_t frame_rate_, uint16_t bit_rate_) :
+        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), VideoEncoder(id), ffmpeg(ffmpeg_),
         frame_rate(frame_rate_), bit_rate(bit_rate_) {
         AVBufferRef *hw_device_ctx{};
         int err{};
 
-        // TODO: change render_path to nullptr
-        if (err = ffmpeg.av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, render_path, nullptr, 0); err < 0) {
+        if (err = ffmpeg.av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, video_encoders::drm_device_path.data(), nullptr, 0); err < 0) {
             throw std::runtime_error(fmt::format("Failed to create VAAPI device context {}", ffmpeg.get_error_description(err)));
         }
 
@@ -65,7 +66,7 @@ namespace rfb {
         pkt_guard.reset(pkt);
     }
 
-    void H264VAAPIEncoder::write_compact(rdr::OutStream *os, int value) {
+    void H264FFMPEGVAAPIEncoder::write_compact(rdr::OutStream *os, int value) {
         auto b = value & 0x7F;
         if (value <= 0x7F) {
             os->writeU8(b);
@@ -81,7 +82,7 @@ namespace rfb {
         }
     }
 
-    bool H264VAAPIEncoder::init(int width, int height, int dst_width, int dst_height) {
+    bool H264FFMPEGVAAPIEncoder::init(int width, int height, int dst_width, int dst_height) {
         AVHWFramesContext *frames_ctx{};
         int err{};
 
@@ -144,11 +145,11 @@ namespace rfb {
         return true;
     }
 
-    bool H264VAAPIEncoder::isSupported() {
+    bool H264FFMPEGVAAPIEncoder::isSupported() {
         return conn->cp.supportsEncoding(encodingKasmVideo);
     }
 
-    void H264VAAPIEncoder::writeRect(const PixelBuffer *pb, const Palette &palette) {
+    void H264FFMPEGVAAPIEncoder::writeRect(const PixelBuffer *pb, const Palette &palette) {
         // compress
         int stride;
         const auto rect = pb->getRect();
@@ -224,9 +225,13 @@ namespace rfb {
         ffmpeg.av_packet_unref(pkt);
     }
 
-    void H264VAAPIEncoder::writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) {}
+    void H264FFMPEGVAAPIEncoder::writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) {}
 
-    void H264VAAPIEncoder::writeSkipRect() {
+    Encoder *H264FFMPEGVAAPIEncoder::clone(u_int32_t id) {
+        return new H264FFMPEGVAAPIEncoder(id, ffmpeg, conn, frame_rate, bit_rate);
+    }
+
+    void H264FFMPEGVAAPIEncoder::writeSkipRect() {
         auto *os = conn->getOutStream(conn->cp.supportsUdp);
         os->writeU8(kasmVideoSkip << 4);
     }

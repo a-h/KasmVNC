@@ -2,12 +2,12 @@
 
 #include "rdr/OutStream.h"
 #include "rfb/Encoder.h"
-#include "rfb/SConnection.h"
 #include "rfb/encoders/VideoEncoder.h"
 #include "rfb/ffmpeg.h"
 
 namespace rfb {
-class H264VAAPIEncoder final : public Encoder, public VideoEncoder {
+class H264FFMPEGVAAPIEncoder final : public Encoder, public VideoEncoder {
+    u_int32_t id;
     const FFmpeg &ffmpeg;
 
     FFmpeg::FrameGuard sw_frame_guard;
@@ -28,10 +28,11 @@ class H264VAAPIEncoder final : public Encoder, public VideoEncoder {
     [[nodiscard]] bool init(int width, int height, int dst_width, int dst_height);
 
 public:
-    H264VAAPIEncoder(const FFmpeg &ffmpeg, SConnection *conn, uint8_t frame_rate, uint16_t bit_rate);
+    H264FFMPEGVAAPIEncoder(u_int32_t id, const FFmpeg &ffmpeg, SConnection *conn, uint8_t frame_rate, uint16_t bit_rate);
     bool isSupported() override;
     void writeRect(const PixelBuffer *pb, const Palette &palette) override;
     void writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) override;
+    Encoder *clone(u_int32_t id) override;
     void writeSkipRect() override;
 };
 } // namespace rfb
