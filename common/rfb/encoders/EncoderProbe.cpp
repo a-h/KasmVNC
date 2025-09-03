@@ -12,14 +12,19 @@ extern "C" {
 #include "rfb/ffmpeg.h"
 
 namespace rfb::video_encoders {
+    const std::vector<KasmVideoEncoders::Encoder>& available_encoders = EncoderProbe::get(FFmpeg::get()).get_available_encoders();
+    const KasmVideoEncoders::Encoder best_encoder = EncoderProbe::get(FFmpeg::get()).select_best_encoder();
+    const std::string_view drm_device_path = EncoderProbe::get(FFmpeg::get()).get_drm_device_path();
+
     struct EncoderCandidate {
         KasmVideoEncoders::Encoder encoder;
         AVCodecID codec_id;
         AVHWDeviceType hw_type;
     };
 
-    static std::array<EncoderCandidate, 2> candidates = {
-            {{KasmVideoEncoders::Encoder::h264_vaapi, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI},
+    static std::array<EncoderCandidate, 3> candidates = {
+            {//{KasmVideoEncoders::Encoder::h264_nvenc, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI}
+                {KasmVideoEncoders::Encoder::h264_vaapi, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI},
              {KasmVideoEncoders::Encoder::h264_software, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_NONE}}};
 
     EncoderProbe::EncoderProbe(FFmpeg &ffmpeg_) : ffmpeg(ffmpeg_) {
@@ -34,14 +39,22 @@ namespace rfb::video_encoders {
                     AVBufferRef *hw_ctx{};
                     hw_ctx_guard.reset(hw_ctx);
 
-                    if (auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, render_path, nullptr, 0); err < 0) {
-                        printf((ffmpeg.get_error_description(err) + '\n').c_str() );
-                        continue;
-                    }
+                    for (auto &drm_dev_path: drm_device_paths) {
+                        const auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, drm_dev_path.data(), nullptr, 0);
+                        if (err < 0) {
+                            puts((ffmpeg.get_error_description(err) + '\n').c_str());
+                        } else {
+                            drm_device_path = drm_dev_path;
 
-                    available_encoders.push_back(encoder_candidate.encoder);
+                            available_encoders.push_back(encoder_candidate.encoder);
+
+                            break;
+                        }
+                    }
                 }
             }
+        } else {
+            available_encoders.push_back(KasmVideoEncoders::Encoder::unavailable);
         }
 
         available_encoders.push_back(KasmVideoEncoders::Encoder::h264_software);
@@ -49,7 +62,7 @@ namespace rfb::video_encoders {
         best_encoder = available_encoders.front();
     }
 
-    bool EncoderProbe::is_acceleration_available() {
+    /*bool EncoderProbe::is_acceleration_available() {
         if (access(render_path, R_OK | W_OK) != 0)
             return false;
 
@@ -60,5 +73,5 @@ namespace rfb::video_encoders {
         close(fd);
 
         return true;
-    }
+    }*/
 } // namespace rfb::video_encoders

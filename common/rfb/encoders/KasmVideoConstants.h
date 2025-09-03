@@ -28,7 +28,12 @@ namespace rfb {
 
     static constexpr int GroupOfPictureSize = 10; // interval between I-frames
 
-    inline const char *render_path = "/dev/dri/renderD128";
+    static constexpr std::array<std::string_view, 4> drm_device_paths = {
+        "/dev/dri/renderD128",
+        "/dev/dri/card0",
+        "/dev/dri/renderD129",
+        "/dev/dri/card1",
+    };
 
     struct SupportedVideoEncoders {
         enum class Codecs : uint8_t
@@ -47,8 +52,10 @@ namespace rfb {
         enum class Encoder : uint8_t
         {
             h264_vaapi,
+            h264_ffmpeg_vaapi,
             h264_nvenc,
-            h264_software
+            h264_software,
+            unavailable
         };
 
         static inline std::array<std::string_view, 3> EncoderNames = {"h264_vaapi", "h264_nvenc", "libx264"};
