@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
- 
+
 #include <network/GetAPI.h>
 #include <network/TcpSocket.h>
 
@@ -47,7 +47,7 @@ using namespace rfb;
 
 static LogWriter vlog("VNCSConnST");
 
-static Cursor emptyCursor(0, 0, Point(0, 0), NULL);
+static Cursor emptyCursor(0, 0, Point(0, 0), nullptr);
 
 namespace {
 const rdr::U32 CLIENT_KEEPALIVE_KEYSYM = 1;
@@ -62,14 +62,14 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
   : upgradingToUdp(false), sock(s), reverseConnection(reverse),
     inProcessMessages(false),
     pendingSyncFence(false), syncFence(false), fenceFlags(0),
-    fenceDataLen(0), fenceData(NULL), congestionTimer(this),
+    fenceDataLen(0), fenceData(nullptr), congestionTimer(this),
     losslessTimer(this), kbdLogTimer(this), binclipTimer(this),
     server(server_), updates(false),
     updateRenderedCursor(false), removeRenderedCursor(false),
     continuousUpdates(false), encodeManager(this, &VNCServerST::encCache, FFmpeg::get()),
     needsPermCheck(false), pointerEventTime(0),
     clientHasCursor(false),
-    accessRights(AccessDefault), startTime(time(0)), frameTracking(false),
+    accessRights(AccessDefault), startTime(time(nullptr)), frameTracking(false),
     udpFramesSinceFull(0), complainedAboutNoViewRights(false), clientUsername("username_unavailable")
 {
   setStreams(&sock->inStream(), &sock->outStream());
@@ -107,10 +107,10 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
 
   // Configure the socket
   setSocketTimeouts();
-  lastEventTime = time(0);
-  gettimeofday(&lastRealUpdate, NULL);
-  gettimeofday(&lastClipboardOp, NULL);
-  gettimeofday(&lastKeyEvent, NULL);
+  lastEventTime = time(nullptr);
+  gettimeofday(&lastRealUpdate, nullptr);
+  gettimeofday(&lastClipboardOp, nullptr);
+  gettimeofday(&lastKeyEvent, nullptr);
 
   server->clients.push_front(this);
 
@@ -140,7 +140,7 @@ VNCSConnectionST::~VNCSConnectionST()
   }
 
   if (server->pointerClient == this)
-    server->pointerClient = 0;
+    server->pointerClient = nullptr;
 
   // Remove this client from the server
   server->clients.remove(this);
@@ -176,7 +176,7 @@ void VNCSConnectionST::close(const char* reason)
     vlog.debug("second close: %s (%s)", peerEndpoint.buf, reason);
 
   if (authenticated()) {
-      server->lastDisconnectTime = time(0);
+      server->lastDisconnectTime = time(nullptr);
 
       // First update the client state to CLOSING to ensure it's not included in user lists
       setState(RFBSTATE_CLOSING);
@@ -540,7 +540,7 @@ int VNCSConnectionST::checkIdleTimeout()
   if (idleTimeout == 0) return 0;
   if (state() != RFBSTATE_NORMAL && idleTimeout < 15)
     idleTimeout = 15; // minimum of 15 seconds while authenticating
-  time_t now = time(0);
+  time_t now = time(nullptr);
   if (now < lastEventTime) {
     // Someone must have set the time backwards.  Set lastEventTime so that the
     // idleTimeout will count from now.
@@ -628,7 +628,7 @@ bool VNCSConnectionST::needRenderedCursor()
       !cp.supportsLocalCursor && !cp.supportsLocalXCursor)
     return true;
   if (!server->cursorPos.equals(pointerEventPos) &&
-      (time(0) - pointerEventTime) > 0)
+      (time(nullptr) - pointerEventTime) > 0)
     return true;
 
   return false;
@@ -1516,7 +1516,7 @@ void VNCSConnectionST::writeDataUpdate()
 
   // Does the client need a server-side rendered cursor?
 
-  cursor = NULL;
+  cursor = nullptr;
   if (needRenderedCursor()) {
     Rect renderedCursorRect;
 
@@ -1568,7 +1568,7 @@ void VNCSConnectionST::writeDataUpdate()
   if (!ui.is_empty()) {
     encodeManager.writeUpdate(ui, server->screenLayout, server->getPixelBuffer(), cursor, maxUpdateSize);
     copypassed.clear();
-    gettimeofday(&lastRealUpdate, NULL);
+    gettimeofday(&lastRealUpdate, nullptr);
     losslessTimer.start(losslessThreshold);
 
     const unsigned ms = encodeManager.getEncodingTime();
@@ -1618,7 +1618,7 @@ void VNCSConnectionST::writeBinaryClipboard()
 
   writer()->writeBinaryClipboard(binaryClipboard);
 
-  gettimeofday(&lastClipboardOp, NULL);
+  gettimeofday(&lastClipboardOp, nullptr);
 }
 
 void VNCSConnectionST::screenLayoutChange(rdr::U16 reason)
