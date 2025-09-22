@@ -91,7 +91,8 @@ namespace rfb {
             std::sort(screens.begin(), screens.end(), compare_screen);
         }
         void remove_screen(rdr::U32 id) {
-            std::erase_if(screens, [id](const Screen &screen) { return screen.id == id; });
+            //std::erase_if(screens, [id](const Screen &screen) { return screen.id == id; });
+            screens.erase(std::remove_if(screens.begin(), screens.end(), [id](const Screen &screen) { return screen.id == id; }), screens.end());
         }
 
         [[nodiscard]] bool validate(int fb_width, int fb_height) const {
@@ -110,7 +111,7 @@ namespace rfb {
                     return false;
                 if (!screen.dimensions.enclosed_by(fb_rect))
                     return false;
-                if (seen_ids.contains(screen.id))
+                if (seen_ids.find(screen.id) != seen_ids.end())
                     return false;
                 seen_ids.insert(screen.id);
             }
