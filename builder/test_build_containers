@@ -7,6 +7,14 @@ current_dir="$(pwd)"
 
 images_list=()
 
+cd kasmweb
+npm install
+npm run build
+
+cd "$current_dir"
+cp -r kasmweb/dist "$current_dir"/builder/www
+
+
 for file in "$script_dir"/dockerfile.*.build; do
     if [[ "$file" == *deb* ]] || [[ "$file" == *apk* ]] || [[ "$file" == *rpm* ]] || [[ "$file" == *www* ]]; then
         continue
@@ -23,17 +31,16 @@ for file in "$script_dir"/dockerfile.*.build; do
 
     echo "Building docker image: $image_name using file: $file"
 
+    rm -rf .cmake CMakeFiles build.ninja cmake_install.cmake cmake_uninstall.cmake CMakeCache.txt config.h
+    rm -rf unix
+    git checkout HEAD -- unix/
+
     docker build -f "$file" -t "$image_name" "$current_dir"
     exit_code=$?
     if [ $exit_code -ne 0 ]; then
         echo "Build failed for $filename"
         break
     fi
-
-    rm -rf .cmake CMakeFiles build.ninja cmake_install.cmake cmake_uninstall.cmake CMakeCache.txt config.h
-    rm -rf unix
-    git checkout HEAD -- unix/
-
 
     echo "Running container from image '$image_name'"
     # Run the container and capture the exit code
