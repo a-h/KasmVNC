@@ -84,7 +84,7 @@ namespace benchmarking {
 
         ~MockSConnection() override = default;
 
-        void writeUpdate(const rfb::UpdateInfo &ui, const ScreenSet& layout, const rfb::PixelBuffer *pb) {
+        void writeUpdate(const rfb::UpdateInfo &ui, const ScreenSet &layout, const rfb::PixelBuffer *pb) {
             cache.clear();
 
             manager.clearEncodingTime();
