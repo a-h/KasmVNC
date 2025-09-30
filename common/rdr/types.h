@@ -19,8 +19,9 @@
 #ifndef __RDR_TYPES_H__
 #define __RDR_TYPES_H__
 
-namespace rdr {
+#include <cstdint>
 
+namespace rdr {
   typedef unsigned char U8;
   typedef unsigned short U16;
   typedef unsigned int U32;
