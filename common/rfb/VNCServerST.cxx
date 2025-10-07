@@ -254,14 +254,16 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
     if (watermarkData)
         sendWatermark = true;
 
-    if (Server::videoCodec[0] && SupportedVideoEncoders::to_string(SupportedVideoEncoders::Codecs::H264) != Server::videoCodec.getValueStr())
-        throw std::invalid_argument(fmt::format("Unknown test videoCodec {}", Server::videoCodec.getValueStr()));
+    const char *selected_codec = Server::videoCodec;
+
+    if (selected_codec[0] && !SupportedVideoEncoders::is_supported(selected_codec))
+        throw std::invalid_argument(fmt::format("Unknown video codec: {}", selected_codec));
 
     if (Server::selfBench)
         SelfBench();
 
     if (Server::benchmark[0]) {
-        auto *file_name = Server::benchmark.getValueStr();
+        const auto *file_name = Server::benchmark.getValueStr();
         if (!std::filesystem::exists(file_name))
             throw std::invalid_argument("Benchmarking video file does not exist");
         benchmark(file_name, Server::benchmarkResults.getValueStr());
