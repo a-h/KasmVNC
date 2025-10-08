@@ -23,14 +23,15 @@ namespace rfb::video_encoders {
         AVHWDeviceType hw_type;
     };
 
-    static std::array<EncoderCandidate, 6> candidates = {
-            {//{KasmVideoEncoders::Encoder::h264_nvenc, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI}
-             {KasmVideoEncoders::Encoder::av1_vaapi, AV_CODEC_ID_AV1, AV_HWDEVICE_TYPE_VAAPI},
-             {KasmVideoEncoders::Encoder::hevc_vaapi, AV_CODEC_ID_HEVC, AV_HWDEVICE_TYPE_VAAPI}, // h265
-             {KasmVideoEncoders::Encoder::h264_vaapi, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI},
-             {KasmVideoEncoders::Encoder::av1_software, AV_CODEC_ID_AV1, AV_HWDEVICE_TYPE_NONE},
-             {KasmVideoEncoders::Encoder::h265_software, AV_CODEC_ID_HEVC, AV_HWDEVICE_TYPE_NONE},
-             {KasmVideoEncoders::Encoder::h264_software, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_NONE}}};
+    static std::array<EncoderCandidate, 6> candidates = {{
+            //{KasmVideoEncoders::Encoder::h264_nvenc, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI}
+            //{KasmVideoEncoders::Encoder::av1_vaapi, AV_CODEC_ID_AV1, AV_HWDEVICE_TYPE_VAAPI},
+            //{KasmVideoEncoders::Encoder::hevc_vaapi, AV_CODEC_ID_HEVC, AV_HWDEVICE_TYPE_VAAPI}, // h265
+            {KasmVideoEncoders::Encoder::h264_vaapi, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_VAAPI},
+            {KasmVideoEncoders::Encoder::h264_software, AV_CODEC_ID_H264, AV_HWDEVICE_TYPE_NONE},
+            {KasmVideoEncoders::Encoder::av1_software, AV_CODEC_ID_AV1, AV_HWDEVICE_TYPE_NONE},
+            {KasmVideoEncoders::Encoder::h265_software, AV_CODEC_ID_HEVC, AV_HWDEVICE_TYPE_NONE},
+    }};
 
     EncoderProbe::EncoderProbe(FFmpeg &ffmpeg_) : ffmpeg(ffmpeg_) {
         if (ffmpeg.is_available()) {
