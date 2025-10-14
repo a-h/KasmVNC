@@ -69,7 +69,8 @@ RUN \
     xorg-server-dev \
     xtrans \
     ffmpeg-dev \
-    libva-dev
+    libva-dev \
+    intel-media-driver
 
 
 ENV SCRIPTS_DIR=/tmp/scripts
