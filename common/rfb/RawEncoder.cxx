@@ -29,11 +29,7 @@ RawEncoder::RawEncoder(SConnection* conn) :
 {
 }
 
-RawEncoder::~RawEncoder()
-{
-}
-
-bool RawEncoder::isSupported()
+bool RawEncoder::isSupported() const
 {
   // Implicitly required;
   return true;

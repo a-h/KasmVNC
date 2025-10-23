@@ -778,6 +778,26 @@ void SMsgWriter::writeUnixRelay(const char *name, const rdr::U8 *buf, const unsi
   endMsg();
 }
 
+void SMsgWriter::writeVideoEncoders(const std::vector<int32_t> &encoders) {
+    startMsg(msgTypeVideoEncoders);
+
+    std::vector<int32_t> conjunction;
+
+    for (const auto encoder: cp->available_encoders) {
+        if (std::ranges::find(encoders, KasmVideoEncoders::to_streaming_mode(encoder)) != encoders.end()) {
+            conjunction.push_back(KasmVideoEncoders::to_encoding(encoder));
+        }
+    }
+
+    const uint8_t size = conjunction.size();
+    os->writeU8(size);
+
+    for (auto encoder: conjunction)
+        os->writeS32(encoder);
+
+    endMsg();
+}
+
 void SMsgWriter::writeUserJoinedSession(const std::string& username)
 {
   startMsg(msgTypeUserAddedToSession);

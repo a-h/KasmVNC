@@ -62,7 +62,7 @@ namespace rfb {
 
     public:
         VAAPIEncoder(uint32_t id, SConnection *conn, uint8_t frame_rate, uint16_t bit_rate);
-        bool isSupported() override;
+        bool isSupported() const override;
         void writeRect(const PixelBuffer *pb, const Palette &palette) override;
         void writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) override;
         void writeSkipRect() override;

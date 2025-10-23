@@ -30,22 +30,22 @@ namespace rfb {
   class TightJPEGEncoder : public Encoder {
   public:
     TightJPEGEncoder(SConnection* conn);
-    virtual ~TightJPEGEncoder();
+    ~TightJPEGEncoder() override = default;
 
-    virtual bool isSupported();
+    bool isSupported() const override;
 
-    virtual void setQualityLevel(int level);
-    virtual void setFineQualityLevel(int quality, int subsampling);
+    void setQualityLevel(int level) override;
+    void setFineQualityLevel(int quality, int subsampling) override;
 
-    virtual bool treatLossless();
+    bool treatLossless() override;
 
-    virtual void writeRect(const PixelBuffer* pb, const Palette& palette);
+    void writeRect(const PixelBuffer* pb, const Palette& palette) override;
     virtual void compressOnly(const PixelBuffer* pb, const uint8_t quality,
                               std::vector<uint8_t> &out, const bool lowVideoQuality) const;
     virtual void writeOnly(const std::vector<uint8_t> &out) const;
-    virtual void writeSolidRect(int width, int height,
+    void writeSolidRect(int width, int height,
                                 const PixelFormat& pf,
-                                const rdr::U8* colour);
+                                const rdr::U8* colour) override;
 
   protected:
     void writeCompact(rdr::U32 value, rdr::OutStream* os) const;

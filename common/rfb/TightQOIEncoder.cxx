@@ -156,11 +156,7 @@ TightQOIEncoder::TightQOIEncoder(SConnection* conn) :
 {
 }
 
-TightQOIEncoder::~TightQOIEncoder()
-{
-}
-
-bool TightQOIEncoder::isSupported()
+bool TightQOIEncoder::isSupported() const
 {
   if (!conn->cp.supportsEncoding(encodingTight))
     return false;

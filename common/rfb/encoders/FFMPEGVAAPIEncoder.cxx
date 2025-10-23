@@ -19,7 +19,7 @@ namespace rfb {
     FFMPEGVAAPIEncoder::FFMPEGVAAPIEncoder(Screen layout_, const FFmpeg &ffmpeg_, SConnection *conn,
                                                    KasmVideoEncoders::Encoder encoder_, VideoEncoderParams params) :
         Encoder(layout_.id, conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), layout(layout_),
-        ffmpeg(ffmpeg_), encoder(encoder_), current_params(params) {
+        ffmpeg(ffmpeg_), encoder(encoder_), current_params(params), msg_codec_id(KasmVideoEncoders::to_msg_id(encoder)) {
         AVBufferRef *hw_device_ctx{};
         int err{};
 
@@ -29,9 +29,10 @@ namespace rfb {
         }
 
         hw_device_ctx_guard.reset(hw_device_ctx);
-        codec = ffmpeg.avcodec_find_encoder_by_name("h264_vaapi");
+        const auto *enc_name = KasmVideoEncoders::to_string(encoder);
+        codec = ffmpeg.avcodec_find_encoder_by_name(enc_name);
         if (!codec)
-            throw std::runtime_error("Could not find h264_vaapi encoder");
+            throw std::runtime_error(fmt::format("Could not find {} encoder",  enc_name));
 
         auto *frame = ffmpeg.av_frame_alloc();
         if (!frame)
@@ -160,14 +161,14 @@ namespace rfb {
         }
 
         auto *sws_ctx = ffmpeg.sws_getContext(
-                width, height, AV_PIX_FMT_RGB32, params.width, params.height, AV_PIX_FMT_NV12, SWS_BILINEAR, nullptr, nullptr, nullptr);
+            width, height, AV_PIX_FMT_RGB32, params.width, params.height, AV_PIX_FMT_NV12, SWS_BILINEAR, nullptr, nullptr, nullptr);
 
         sws_guard.reset(sws_ctx);
 
         return true;
     }
 
-    bool FFMPEGVAAPIEncoder::isSupported() {
+    bool FFMPEGVAAPIEncoder::isSupported() const {
         return conn->cp.supportsEncoding(encodingKasmVideo);
     }
 
@@ -191,10 +192,10 @@ namespace rfb {
             dst_height = height & ~1;
 
         VideoEncoderParams params{dst_width,
-                                  dst_height,
-                                  static_cast<uint8_t>(Server::frameRate),
-                                  static_cast<uint8_t>(Server::groupOfPicture),
-                                  static_cast<uint8_t>(Server::videoQualityCRFCQP)};
+            dst_height,
+            static_cast<uint8_t>(Server::frameRate),
+            static_cast<uint8_t>(Server::groupOfPicture),
+            static_cast<uint8_t>(Server::videoQualityCRFCQP)};
 
         if (current_params != params) {
             bpp = pb->getPF().bpp >> 3;
@@ -221,7 +222,7 @@ namespace rfb {
 
         if (err = ffmpeg.av_hwframe_transfer_data(hw_frame_guard.get(), frame, 0); err < 0) {
             vlog.error(
-                    "Error while transferring frame data to surface (%s). Error code: %d", ffmpeg.get_error_description(err).c_str(), err);
+                "Error while transferring frame data to surface (%s). Error code: %d", ffmpeg.get_error_description(err).c_str(), err);
         }
 
         if (err = ffmpeg.avcodec_send_frame(ctx_guard.get(), hw_frame_guard.get()); err < 0) {
@@ -247,7 +248,8 @@ namespace rfb {
             vlog.debug("Key frame %ld", frame->pts);
 
         auto *os = conn->getOutStream(conn->cp.supportsUdp);
-        os->writeU8(kasmVideoH264 << 4);
+        os->writeU8(layout.id);
+        os->writeU8(msg_codec_id);
         os->writeU8(pkt->flags & AV_PKT_FLAG_KEY);
         write_compact(os, pkt->size);
         os->writeBytes(&pkt->data[0], pkt->size);

@@ -26,15 +26,16 @@
 
 #include <sys/time.h>
 
-#include <rfb/EncCache.h>
-#include <rfb/SDesktop.h>
-#include <rfb/VNCServer.h>
-#include <rfb/LogWriter.h>
+#include <network/Socket.h>
 #include <rfb/Blacklist.h>
 #include <rfb/Cursor.h>
-#include <rfb/Timer.h>
-#include <network/Socket.h>
+#include <rfb/EncCache.h>
+#include <rfb/LogWriter.h>
+#include <rfb/SDesktop.h>
 #include <rfb/ScreenSet.h>
+#include <rfb/Timer.h>
+#include <rfb/VNCServer.h>
+#include <rfb/encoders/KasmVideoConstants.h>
 #include <string>
 
 namespace rfb {
@@ -237,6 +238,7 @@ namespace rfb {
     std::list<network::Socket*> closingSockets;
 
     static EncCache encCache;
+    std::vector<KasmVideoEncoders::Encoder> encoders{};
 
     ComparingUpdateTracker* comparer;
 

@@ -118,6 +118,8 @@ namespace benchmarking {
 
         void unixRelay(const char *name, const rdr::U8 *buf, const unsigned len) override {}
 
+        void videoEncodersRequest(const std::vector<int32_t> &encoders) override {}
+
         void handleFrameStats(rdr::U32 all, rdr::U32 render) override {}
 
         [[nodiscard]] auto getJpegStats() const {

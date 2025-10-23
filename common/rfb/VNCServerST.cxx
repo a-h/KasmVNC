@@ -160,7 +160,7 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
 
     std::string available_accelerators{};
     for (const auto encoder: video_encoders::available_encoders) {
-        if (encoder != KasmVideoEncoders::Encoder::h264_software) {
+        if (KasmVideoEncoders::is_accelerated(encoder)) {
             if (!available_accelerators.empty())
                 available_accelerators.append(", ");
 
@@ -168,8 +168,8 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
         }
     }
 
-    const auto str = available_accelerators;
-    slog.info("Hardware video encoding acceleration capability: %s", str.empty() ? "none" : str.c_str());
+    slog.info("Hardware video encoding acceleration capability: %s",
+        available_accelerators.empty() ? "none" : available_accelerators.c_str());
 
   DLPRegion.enabled = DLPRegion.percents = false;
 
@@ -258,6 +258,20 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
 
     if (selected_codec[0] && !SupportedVideoEncoders::is_supported(selected_codec))
         throw std::invalid_argument(fmt::format("Unknown video codec: {}", selected_codec));
+
+    const auto selected_encoders = SupportedVideoEncoders::parse(selected_codec);
+
+    for (auto encoder: video_encoders::available_encoders) {
+        if (std::ranges::find(selected_encoders, encoder) != selected_encoders.end())
+            encoders.push_back(encoder);
+    }
+
+    std::string encoder_names;
+
+    for (auto encoder: encoders)
+        encoder_names.append(KasmVideoEncoders::to_string(encoder)).append(" ");
+
+    slog.info("Using CLI-specified video codecs (supported subset): %s", encoder_names.c_str());
 
     if (Server::selfBench)
         SelfBench();

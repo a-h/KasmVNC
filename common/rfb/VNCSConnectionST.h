@@ -258,12 +258,13 @@ namespace rfb {
     virtual void udpUpgrade(const char *resp);
     virtual void subscribeUnixRelay(const char *name);
     virtual void unixRelay(const char *name, const rdr::U8 *buf, const unsigned len);
+      void videoEncodersRequest(std::vector<int32_t> const &encoders) override;
     virtual void supportsLocalCursor();
     virtual void supportsFence();
     virtual void supportsContinuousUpdates();
     virtual void supportsLEDState();
 
-    virtual bool canChangeKasmSettings() const {
+    bool canChangeKasmSettings() const override {
         return (accessRights & (AccessPtrEvents | AccessKeyEvents)) ==
                (AccessPtrEvents | AccessKeyEvents);
     }

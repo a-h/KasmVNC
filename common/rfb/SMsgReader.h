@@ -68,6 +68,7 @@ namespace rfb {
 
     void readSubscribeUnixRelay();
     void readUnixRelay();
+      void readVideoEncodersRequest() const;
 
     SMsgHandler* handler;
     rdr::InStream* is;

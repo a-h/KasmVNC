@@ -167,9 +167,9 @@ static void updateMaxVideoRes(uint16_t *x, uint16_t *y) {
   }
 }
 
-EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmpeg& ffmpeg) :
+EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmpeg& ffmpeg_) :
     conn(conn_), dynamicQualityMin(-1), dynamicQualityOff(-1), areaCur(0), videoDetected(false), videoTimer(this),
-    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), ffmpeg_available(ffmpeg.is_available()), encCache(encCache_)
+    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), ffmpeg(ffmpeg_), ffmpeg_available(ffmpeg.is_available()), encCache(encCache_)
 {
     encoders.resize(encoderClassMax, nullptr);
     activeEncoders.resize(encoderTypeMax, encoderRaw);
@@ -437,24 +437,41 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     writeCopyRects(copied, copyDelta);
     writeCopyPassRects(copypassed);
 
-    // If a video codec is enabled, send that stream constantly
-    /*if (ffmpeg_available && video_mode_available) {
-         startRect(pb->getRect(), encoderFullColour, true, STARTRECT_OVERRIDE_KASMVIDEO);
+    if (video_mode_available && conn->cp.encoder != KasmVideoEncoders::Encoder::unavailable) {
 
-         encoders[encoderKasmVideo]->writeRect(pb, Palette());
-
-         endRect(STARTRECT_OVERRIDE_KASMVIDEO);
-     }*/
-
-    if (video_mode_available) {
-        auto *screen_encoder_manager = dynamic_cast<ScreenEncoderManager *>(encoders[encoderKasmVideo]);
+        auto begin = msSince(&start);
+        auto *screen_encoder_manager = dynamic_cast<ScreenEncoderManager<> *>(encoders[encoderKasmVideo]);
         if (screen_encoder_manager) {
+            if (screen_encoder_manager->get_encoder() != conn->cp.encoder) {
+                delete encoders[encoderKasmVideo];
+
+                //puts("CHANGING ENCODER!!!");
+                //puts("CHANGING ENCODER!!!");
+                //puts("CHANGING ENCODER!!!");
+                //puts("CHANGING ENCODER!!!");
+                //puts("CHANGING ENCODER!!!");
+
+                encoders[encoderKasmVideo] = new ScreenEncoderManager(ffmpeg,
+                                                              conn->cp.encoder,
+                                                              video_encoders::available_encoders,
+                                                              conn,
+                                                              {0,
+                                                               0,
+                                                               static_cast<uint8_t>(Server::frameRate),
+                                                               static_cast<uint8_t>(Server::groupOfPicture),
+                                                               static_cast<uint8_t>(Server::videoQualityCRFCQP)});
+
+            }
             screen_encoder_manager->sync_layout(layout);
 
-            for (auto screen_encoder: *screen_encoder_manager) {
-                uint32_t screen_id = screen_encoder->getId();
-                auto *encoder = startRect(pb->getRect(), encoderFullColour, true, STARTRECT_OVERRIDE_KASMVIDEO);
-                screen_encoder->writeRect(pb, Palette());
+            const Palette palette;
+
+            for (auto &screen: *screen_encoder_manager) {
+                if (!screen.encoder)
+                    continue;
+
+                startRect(screen.layout.dimensions, encoderFullColour, true, STARTRECT_OVERRIDE_KASMVIDEO);
+                screen.encoder->writeRect(pb, palette);
                 endRect(STARTRECT_OVERRIDE_KASMVIDEO);
             }
         }
@@ -462,6 +479,10 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
         std::vector<Rect> rects;
         changed.get_rects(&rects);
         updateVideoStats(rects, pb);
+
+        auto end = msSince(&start) - begin;
+
+        printf("ENCODING TOOK: %d ms\n", end);
     } else {
         /*
          * We start by searching for solid rects, which are then removed
@@ -747,7 +768,7 @@ Encoder *EncodeManager::startRect(const Rect &rect, int type, const bool trackQu
     return encoder;
 }
 
-void EncodeManager::endRect(const enum startRectOverride overrider)
+void EncodeManager::endRect(const startRectOverride overrider)
 {
     conn->writer()->endRect();
     const auto length = conn->getOutStream(conn->cp.supportsUdp)->length() - beforeLength;

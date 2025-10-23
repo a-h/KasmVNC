@@ -19,6 +19,7 @@ namespace rfb {
 
         KasmVideoEncoders::Encoder encoder;
         VideoEncoderParams current_params{};
+        uint8_t msg_codec_id;
 
         int64_t pts{};
         int bpp{};
@@ -30,7 +31,7 @@ namespace rfb {
         SoftwareEncoder(Screen layout, const FFmpeg &ffmpeg, SConnection *conn, KasmVideoEncoders::Encoder encoder,
                             VideoEncoderParams params);
     public:
-        bool isSupported() override;
+        bool isSupported() const override;
         void writeRect(const PixelBuffer *pb, const Palette &palette) override;
         void writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) override;
         void writeSkipRect() override;

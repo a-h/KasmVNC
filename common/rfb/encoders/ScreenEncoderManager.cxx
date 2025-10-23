@@ -6,15 +6,21 @@
 #include "rfb/encodings.h"
 
 namespace rfb {
-    ScreenEncoderManager::ScreenEncoderManager(const FFmpeg &ffmpeg_, KasmVideoEncoders::Encoder encoder,
+    template<int T>
+    ScreenEncoderManager<T>::ScreenEncoderManager(const FFmpeg &ffmpeg_, KasmVideoEncoders::Encoder encoder,
                                                const std::vector<KasmVideoEncoders::Encoder> &encoders, SConnection *conn,
                                                VideoEncoderParams params) :
         Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
         current_params(params), base_video_encoder(encoder), available_encoders(encoders) {}
 
-    ScreenEncoderManager::~ScreenEncoderManager() = default;
+    template<int T>
+    ScreenEncoderManager<T>::~ScreenEncoderManager() {
+        for (uint8_t i = 0; i < get_screen_count(); ++i)
+            remove_screen(i);
+    };
 
-    Encoder *ScreenEncoderManager::add_screen(const Screen &layout) const {
+    template<int T>
+    Encoder *ScreenEncoderManager<T>::add_encoder(const Screen &layout) const {
         Encoder *encoder{};
         try {
             encoder = create_encoder(layout, &ffmpeg, conn, base_video_encoder, current_params);
@@ -33,63 +39,65 @@ namespace rfb {
         return encoder;
     }
 
-    size_t ScreenEncoderManager::get_screen_count() const {
-        return encoders.size();
+    template<int T>
+    void ScreenEncoderManager<T>::add_screen(uint8_t index, const Screen &layout) {
+        printf("SCREEN ADDED: %d (%d, %d, %d, %d)\n", index, layout.dimensions.tl.x, layout.dimensions.tl.y, layout.dimensions.br.x, layout.dimensions.br.y);
+        auto *encoder = add_encoder(layout);
+        assert(encoder);
+        screens[index] = {layout, encoder};
+        head = std::min(head, index);
+        tail = std::max(tail, index);
     }
 
-    void ScreenEncoderManager::remove_screen(Encoder *encoder) {
-        std::erase(encoders, encoder);
+    template<int T>
+    size_t ScreenEncoderManager<T>::get_screen_count() const {
+        return std::max(0, tail - head + 1);
     }
 
-    Encoder *ScreenEncoderManager::get_screen(size_t idx) const {
-        assert(idx < encoders.size());
-        return encoders[idx];
-    }
-    VideoEncoder *ScreenEncoderManager::get_video_encoder(size_t index) const {
-        assert(index < encoders.size());
-        return reinterpret_cast<VideoEncoder *>(encoders[index]);
+    template<int T>
+    void ScreenEncoderManager<T>::remove_screen(uint8_t index) {
+        if (screens[index].encoder) {
+            delete screens[index].encoder;
+            screens[index].encoder = nullptr;
+        }
+        screens[index].layout = {};
     }
 
-    void ScreenEncoderManager::sync_layout(const ScreenSet &layout) {
-        const auto new_count = layout.num_screens();
-        const auto current_count = static_cast<int>(encoders.size());
-        const auto min_count = std::min(new_count, current_count);
+    template<int T>
+    void ScreenEncoderManager<T>::sync_layout(const ScreenSet &layout) {
+        for (uint8_t i = 0; i < layout.num_screens(); ++i) {
+            const auto &screen = layout.screens[i];
+            auto id = screen.id;
+            if (id > ScreenSet::MAX_SCREENS) {
+                assert("Wrong  id");
+                id = 0;
+            }
 
-        for (size_t i = 0; i < min_count; ++i) {
-            auto *encoder = encoders[i];
-            if (!encoder || layout.screens[i].id != encoder->getId()) {
-                delete encoders[i];
-                encoders[i] = add_screen(layout.screens[i]);
+            if (!screens[id].layout.dimensions.equals(screen.dimensions)) {
+                remove_screen(id);
+                add_screen(id, screen);
             }
         }
-
-        if (new_count < current_count) {
-            encoders.erase(encoders.begin() + new_count, encoders.end());
-        } else if (new_count > current_count) {
-            encoders.reserve(new_count);
-
-            for (size_t i = current_count; i < new_count; ++i) {
-                encoders.emplace_back(add_screen(layout.screens[i]));
-            }
-        }
     }
 
-    bool ScreenEncoderManager::isSupported() {
-        auto *base_encoder = encoders.front();
-        assert(!base_encoder);
-        return base_encoder->isSupported();
+    template<int T>
+    bool ScreenEncoderManager<T>::isSupported() const {
+        if (const auto *encoder = screens[head].encoder; encoder)
+            return encoder->isSupported();
+
+        return false;
     }
 
-    void ScreenEncoderManager::writeRect(const PixelBuffer *pb, const Palette &palette) {
-        auto *base_encoder = encoders.front();
-        assert(!base_encoder);
-        base_encoder->writeRect(pb, palette);
+    template<int T>
+    void ScreenEncoderManager<T>::writeRect(const PixelBuffer *pb, const Palette &palette) {
+        if (auto *encoder = screens[head].encoder; encoder)
+            return encoder->writeRect(pb, palette);
     }
 
-    void ScreenEncoderManager::writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) {
-        auto *base_encoder = encoders.front();
-        assert(!base_encoder);
-        base_encoder->writeSolidRect(width, height, pf, colour);
+    template<int T>
+    void ScreenEncoderManager<T>::writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) {
+        if (auto *encoder = screens[head].encoder; encoder)
+            encoder->writeSolidRect(width, height, pf, colour);
     }
 
 } // namespace rfb

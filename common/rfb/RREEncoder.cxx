@@ -41,11 +41,7 @@ RREEncoder::RREEncoder(SConnection* conn) :
 {
 }
 
-RREEncoder::~RREEncoder()
-{
-}
-
-bool RREEncoder::isSupported()
+bool RREEncoder::isSupported() const
 {
   return conn->cp.supportsEncoding(encodingRRE);
 }

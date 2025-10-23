@@ -4,22 +4,24 @@ extern "C" {
 #include <libavutil/opt.h>
 }
 #include "KasmVideoConstants.h"
-#include "rfb/LogWriter.h"
-#include "rfb/SConnection.h"
-#include "rfb/ServerCore.h"
-#include "rfb/encodings.h"
-#include "rfb/ffmpeg.h"
+#include <rfb/LogWriter.h>
+#include <rfb/SConnection.h>
+#include <rfb/ServerCore.h>
+#include <rfb/encodings.h>
+#include <rfb/ffmpeg.h>
+#include <fmt/format.h>
 
-static rfb::LogWriter vlog("H264SoftwareEncoder");
+static rfb::LogWriter vlog("SoftwareEncoder");
 
 namespace rfb {
     SoftwareEncoder::SoftwareEncoder(Screen layout_, const FFmpeg &ffmpeg_, SConnection *conn, KasmVideoEncoders::Encoder encoder_,
                                              VideoEncoderParams params) :
         Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), layout(layout_),
-        ffmpeg(ffmpeg_), encoder(encoder_), current_params(params) {
-        codec = ffmpeg.avcodec_find_encoder(AV_CODEC_ID_H264);
+        ffmpeg(ffmpeg_), encoder(encoder_), current_params(params), msg_codec_id(KasmVideoEncoders::to_msg_id(encoder)) {
+        const auto *enc_name = KasmVideoEncoders::to_string(encoder);
+        codec = ffmpeg.avcodec_find_encoder_by_name(enc_name);
         if (!codec)
-            throw std::runtime_error("Could not find H264 encoder");
+            throw std::runtime_error(fmt::format("Could not find {} encoder", enc_name));
 
         auto *frame = ffmpeg.av_frame_alloc();
         if (!frame) {
@@ -34,7 +36,7 @@ namespace rfb {
         pkt_guard.reset(pkt);
     }
 
-    bool SoftwareEncoder::isSupported() {
+    bool SoftwareEncoder::isSupported() const {
         return conn->cp.supportsEncoding(encodingKasmVideo);
     }
 
@@ -111,7 +113,8 @@ namespace rfb {
             vlog.debug("Key frame %ld", frame->pts);
 
         auto *os = conn->getOutStream(conn->cp.supportsUdp);
-        os->writeU8(kasmVideoH264 << 4);
+        os->writeU8(layout.id);
+        os->writeU8(msg_codec_id);
         os->writeU8(pkt->flags & AV_PKT_FLAG_KEY);
         write_compact(os, pkt->size);
         os->writeBytes(&pkt->data[0], pkt->size);

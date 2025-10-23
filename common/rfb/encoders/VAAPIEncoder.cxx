@@ -259,7 +259,7 @@ namespace rfb {
         return true;*/
     }
 
-    bool VAAPIEncoder::isSupported() {
+    bool VAAPIEncoder::isSupported() const {
         return conn->cp.supportsEncoding(encodingKasmVideo);
     }
 

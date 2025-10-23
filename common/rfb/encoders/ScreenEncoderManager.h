@@ -6,36 +6,45 @@
 #include "rfb/ffmpeg.h"
 
 namespace rfb {
+    template<int T = ScreenSet::MAX_SCREENS>
     class ScreenEncoderManager final : public Encoder {
+        struct screen_t {
+            Screen layout{};
+            Encoder *encoder{};
+        };
+
+        uint8_t head{};
+        uint8_t tail{};
+
+        std::array<screen_t, T> screens{};
         const FFmpeg &ffmpeg;
         VideoEncoderParams current_params;
 
         KasmVideoEncoders::Encoder base_video_encoder;
         std::vector<KasmVideoEncoders::Encoder> available_encoders;
-        std::vector<Encoder *> encoders;
 
-        Encoder *add_screen(const Screen &layout) const;
+        Encoder *add_encoder(const Screen &layout) const;
+        void add_screen(uint8_t index, const Screen &layout);
         [[nodiscard]] size_t get_screen_count() const;
-        void remove_screen(Encoder *encoder);
-        Encoder *get_screen(size_t screen_id) const;
-        VideoEncoder *get_video_encoder(size_t index) const;
+        void remove_screen(uint8_t index);
 
     public:
-        // Iterators
-        using iterator = std::vector<Encoder *>::iterator;
-        using const_iterator = std::vector<Encoder *>::const_iterator;
+        // Iterator
+        using iterator = typename std::array<screen_t, T>::iterator;
+        using const_iterator = typename std::array<screen_t, T>::const_iterator;
+
         iterator begin() {
-            return encoders.begin();
+            return screens.begin();
         }
         iterator end() {
-            return encoders.end();
+            return screens.end();
         }
 
         [[nodiscard]] const_iterator cbegin() const {
-            return encoders.begin();
+            return screens.begin();
         }
         [[nodiscard]] const_iterator cend() const {
-            return encoders.end();
+            return screens.end();
         }
 
         explicit ScreenEncoderManager(const FFmpeg &ffmpeg_, KasmVideoEncoders::Encoder encoder,
@@ -50,10 +59,14 @@ namespace rfb {
 
         void sync_layout(const ScreenSet &layout);
 
+        KasmVideoEncoders::Encoder get_encoder() const { return base_video_encoder; }
+
         // Encoder
-        bool isSupported() override;
+        bool isSupported() const override;
 
         void writeRect(const PixelBuffer *pb, const Palette &palette) override;
         void writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) override;
     };
+
+    template class ScreenEncoderManager<>;
 } // namespace rfb

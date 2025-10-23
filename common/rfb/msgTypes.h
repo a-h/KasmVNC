@@ -21,57 +21,58 @@
 namespace rfb {
   // server to client
 
-  const int msgTypeFramebufferUpdate = 0;
-  const int msgTypeSetColourMapEntries = 1;
-  const int msgTypeBell = 2;
-  const int msgTypeServerCutText = 3;
+  constexpr int msgTypeFramebufferUpdate = 0;
+  constexpr int msgTypeSetColourMapEntries = 1;
+  constexpr int msgTypeBell = 2;
+  constexpr int msgTypeServerCutText = 3;
 
-  const int msgTypeEndOfContinuousUpdates = 150;
+  constexpr int msgTypeEndOfContinuousUpdates = 150;
 
   // kasm
-  const int msgTypeStats = 178;
-  const int msgTypeRequestFrameStats = 179;
-  const int msgTypeBinaryClipboard = 180;
-  const int msgTypeUpgradeToUdp = 181;
-  const int msgTypeSubscribeUnixRelay = 182;
-  const int msgTypeUnixRelay = 183;
-  const int msgTypeKeepAlive = 184;
-  const int msgTypeServerDisconnect = 185;
+  constexpr int msgTypeStats = 178;
+  constexpr int msgTypeRequestFrameStats = 179;
+  constexpr int msgTypeBinaryClipboard = 180;
+  constexpr int msgTypeUpgradeToUdp = 181;
+  constexpr int msgTypeSubscribeUnixRelay = 182;
+  constexpr int msgTypeUnixRelay = 183;
+  constexpr int msgTypeVideoEncoders = 184;
+  constexpr int msgTypeKeepAlive = 185;
+  constexpr int msgTypeServerDisconnect = 186;
 
-  const int msgTypeServerFence = 248;
-  const int msgTypeUserAddedToSession = 253;
-  const int msgTypeUserRemovedFromSession = 254;
-
+  constexpr int msgTypeServerFence = 248;
+  constexpr int msgTypeUserAddedToSession = 253;
+  constexpr int msgTypeUserRemovedFromSession = 254;
 
   // client to server
 
-  const int msgTypeSetPixelFormat = 0;
-  const int msgTypeFixColourMapEntries = 1;
-  const int msgTypeSetEncodings = 2;
-  const int msgTypeFramebufferUpdateRequest = 3;
-  const int msgTypeKeyEvent = 4;
-  const int msgTypePointerEvent = 5;
-  const int msgTypeClientCutText = 6;
+  constexpr int msgTypeSetPixelFormat = 0;
+  constexpr int msgTypeFixColourMapEntries = 1;
+  constexpr int msgTypeSetEncodings = 2;
+  constexpr int msgTypeFramebufferUpdateRequest = 3;
+  constexpr int msgTypeKeyEvent = 4;
+  constexpr int msgTypePointerEvent = 5;
+  constexpr int msgTypeClientCutText = 6;
 
-  const int msgTypeEnableContinuousUpdates = 150;
+  constexpr int msgTypeEnableContinuousUpdates = 150;
 
   // kasm
-  const int msgTypeRequestStats = 178;
-  const int msgTypeFrameStats = 179;
+  constexpr int msgTypeRequestStats = 178;
+  constexpr int msgTypeFrameStats = 179;
   // same as the other direction
-  //const int msgTypeBinaryClipboard = 180;
-  //const int msgTypeUpgradeToUdp = 181;
-  //const int msgTypeSubscribeUnixRelay = 182;
-  //const int msgTypeUnixRelay = 183;
-  //const int msgTypeKeepAlive = 184;
-  //const int msgTypeServerDisconnect = 185;
+  //constexpr int msgTypeBinaryClipboard = 180;
+  //constexpr int msgTypeUpgradeToUdp = 181;
+  //constexpr int msgTypeSubscribeUnixRelay = 182;
+  //constexpr int msgTypeUnixRelay = 183;
+  //constexpr int msgTypeVideoEncoders = 184;
+  //constexpr int msgTypeKeepAlive = 185;
+  //constexpr int msgTypeServerDisconnect = 186;
 
-  const int msgTypeClientFence = 248;
+  constexpr int msgTypeClientFence = 248;
 
-  const int msgTypeSetDesktopSize = 251;
+  constexpr int msgTypeSetDesktopSize = 251;
 
-  const int msgTypeSetMaxVideoResolution = 252;
+  constexpr int msgTypeSetMaxVideoResolution = 252;
 
-  const int msgTypeQEMUClientMessage = 255;
+  constexpr int msgTypeQEMUClientMessage = 255;
 }
 #endif

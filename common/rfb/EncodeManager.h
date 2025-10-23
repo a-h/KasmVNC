@@ -216,6 +216,7 @@ namespace rfb {
     unsigned maxEncodingTime, framesSinceEncPrint;
     unsigned scalingTime;
 
+    const FFmpeg &ffmpeg;
     bool ffmpeg_available;
     bool video_mode_available{false};
 

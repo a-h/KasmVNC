@@ -101,6 +101,7 @@ namespace rfb {
 
     virtual void subscribeUnixRelay(const char *name) = 0;
     virtual void unixRelay(const char *name, const rdr::U8 *buf, const unsigned len) = 0;
+      virtual void videoEncodersRequest(const std::vector<int32_t> &encoders) = 0;
 
     ConnParams cp;
   };

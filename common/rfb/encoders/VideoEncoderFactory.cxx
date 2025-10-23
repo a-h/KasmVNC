@@ -100,15 +100,23 @@ namespace rfb {
                             VideoEncoderParams params) {
         switch (video_encoder) {
             case KasmVideoEncoders::Encoder::h264_vaapi:
+            case KasmVideoEncoders::Encoder::h265_vaapi:
+            case KasmVideoEncoders::Encoder::av1_vaapi:
                 // return
                 // H264VAAPIEncoderBuilder::create().with_connection(conn).with_frame_rate(frame_rate).with_bit_rate(bit_rate).build();
             case KasmVideoEncoders::Encoder::h264_ffmpeg_vaapi:
+            case KasmVideoEncoders::Encoder::h265_ffmpeg_vaapi:
+            case KasmVideoEncoders::Encoder::av1_ffmpeg_vaapi:
                 return FFMPEGVAAPIEncoderBuilder::create(ffmpeg)
                         .with_layout(layout)
                         .with_connection(conn)
                         .with_encoder(video_encoder)
                         .with_params(params)
                         .build();
+            case KasmVideoEncoders::Encoder::h264_nvenc:
+            case KasmVideoEncoders::Encoder::h265_nvenc:
+            case KasmVideoEncoders::Encoder::av1_nvenc:
+                throw std::runtime_error("NVENC is not supported yet");
             default:
                 return SoftwareEncoderBuilder::create(ffmpeg)
                         .with_layout(layout)

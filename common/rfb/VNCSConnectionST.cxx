@@ -41,6 +41,7 @@
 #include <cstdint>
 #include <wordexp.h>
 
+#include "encoders/EncoderProbe.h"
 #include "kasmpasswd.h"
 
 using namespace rfb;
@@ -89,9 +90,11 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
 
   user[0] = '\0';
   const char *at = strrchr(peerEndpoint.buf, '@');
-  if (at && at - peerEndpoint.buf > 1 && at - peerEndpoint.buf < USERNAME_LEN) {
-    memcpy(user, peerEndpoint.buf, at - peerEndpoint.buf);
-    user[at - peerEndpoint.buf] = '\0';
+
+  const auto offset = at - peerEndpoint.buf;
+  if (at && offset > 1 && static_cast<size_t>(offset) < USERNAME_LEN) {
+    memcpy(user, peerEndpoint.buf, offset);
+    user[offset] = '\0';
   }
 
   bool read, write, owner;
@@ -111,6 +114,8 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
   gettimeofday(&lastRealUpdate, nullptr);
   gettimeofday(&lastClipboardOp, nullptr);
   gettimeofday(&lastKeyEvent, nullptr);
+
+  cp.available_encoders = video_encoders::available_encoders;
 
   server->clients.push_front(this);
 
@@ -1906,6 +1911,10 @@ void VNCSConnectionST::unixRelay(const char *name, const rdr::U8 *buf, const uns
       return;
     }
   }
+}
+
+void VNCSConnectionST::videoEncodersRequest(const std::vector<int32_t> &encoders) {
+    writer()->writeVideoEncoders(encoders);
 }
 
 void VNCSConnectionST::sendUnixRelayData(const char name[], const unsigned char *buf,

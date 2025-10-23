@@ -29,18 +29,19 @@
 #include <rfb/Cursor.h>
 #include <rfb/PixelFormat.h>
 #include <rfb/ScreenSet.h>
+#include <rfb/encoders/KasmVideoConstants.h>
 
 namespace rdr { class InStream; }
 
 namespace rfb {
 
-  const int subsampleUndefined = -1;
-  const int subsampleNone = 0;
-  const int subsampleGray = 1;
-  const int subsample2X = 2;
-  const int subsample4X = 3;
-  const int subsample8X = 4;
-  const int subsample16X = 5;
+  constexpr int subsampleUndefined = -1;
+  constexpr int subsampleNone = 0;
+  constexpr int subsampleGray = 1;
+  constexpr int subsample2X = 2;
+  constexpr int subsample4X = 3;
+  constexpr int subsample8X = 4;
+  constexpr int subsample16X = 5;
 
   class SMsgHandler;
 
@@ -91,7 +92,7 @@ namespace rfb {
 
     void setEncodings(int nEncodings, const rdr::S32* encodings);
 
-    unsigned int ledState() { return ledState_; }
+    unsigned int ledState() const { return ledState_; }
     void setLEDState(unsigned int state);
 
     rdr::U32 clipboardFlags() const { return clipFlags; }
@@ -143,6 +144,8 @@ namespace rfb {
     };
 
     bool kasmPassed[KASM_NUM_SETTINGS];
+      KasmVideoEncoders::Encoder encoder{KasmVideoEncoders::Encoder::unavailable};
+      KasmVideoEncoders::Encoders available_encoders;
 
   private:
 

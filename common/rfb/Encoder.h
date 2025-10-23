@@ -50,7 +50,7 @@ namespace rfb {
     // isSupported() should return a boolean indicating if this encoder
     // is okay to use with the current connection. This usually involves
     // checking the list of encodings in the connection parameters.
-    virtual bool isSupported()=0;
+    virtual bool isSupported() const = 0;
 
     virtual void setCompressLevel(int level) {};
     virtual void setQualityLevel(int level) {};

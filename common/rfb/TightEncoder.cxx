@@ -62,11 +62,7 @@ TightEncoder::TightEncoder(SConnection* conn) :
   setCompressLevel(-1);
 }
 
-TightEncoder::~TightEncoder()
-{
-}
-
-bool TightEncoder::isSupported()
+bool TightEncoder::isSupported() const
 {
   return conn->cp.supportsEncoding(encodingTight);
 }
