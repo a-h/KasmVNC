@@ -69,11 +69,11 @@ set(RFB_SOURCES
         util.cxx
         xxhash.c
         ffmpeg.cxx
-        encoders/H264SoftwareEncoder.cxx
+        encoders/SoftwareEncoder.cxx
         benchmark/FfmpegFrameFeeder.cpp
         encoders/ScreenEncoderManager.cxx
-        encoders/H264VAAPIEncoder.cxx
-        encoders/H264FFMPEGVAAPIEncoder.cxx
+        encoders/VAAPIEncoder.cxx
+        encoders/FFMPEGVAAPIEncoder.cxx
         encoders/ScreenEncoderManager.cxx
         encoders/VideoEncoderFactory.cxx
         encoders/EncoderProbe.cpp
