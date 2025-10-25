@@ -3,6 +3,8 @@
 Language: Cpp
 BasedOnStyle: LLVM
 AccessModifierOffset: -4
+AlignArrayOfStructures: Left
+AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignOperands: true
@@ -35,7 +37,8 @@ BreakConstructorInitializers: AfterColon
 BreakConstructorInitializersBeforeComma: false
 ColumnLimit: 120
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
-ContinuationIndentWidth: 8
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
@@ -51,6 +54,7 @@ MacroBlockBegin: ''
 MacroBlockEnd: ''
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
+PackConstructorInitializers: Never
 SortIncludes: CaseSensitive
 SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: false
