@@ -254,24 +254,23 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
     if (watermarkData)
         sendWatermark = true;
 
-    const char *selected_codec = Server::videoCodec;
+    const char *codec_cli_arg = Server::videoCodec;
+    if (codec_cli_arg[0]) {
+        const auto parsed_codecs = SupportedVideoEncoders::parse(codec_cli_arg);
+        for (auto codec: parsed_codecs) {
+            if (!SupportedVideoEncoders::is_supported(codec))
+                throw std::invalid_argument(fmt::format("Unknown video codec: {}", codec));
+        }
 
-    if (selected_codec[0] && !SupportedVideoEncoders::is_supported(selected_codec))
-        throw std::invalid_argument(fmt::format("Unknown video codec: {}", selected_codec));
+        encoders = SupportedVideoEncoders::filter_available_encoders(SupportedVideoEncoders::map_encoders(parsed_codecs), video_encoders::available_encoders);
 
-    const auto selected_encoders = SupportedVideoEncoders::parse(selected_codec);
+        std::string encoder_names;
 
-    for (auto encoder: video_encoders::available_encoders) {
-        if (std::ranges::find(selected_encoders, encoder) != selected_encoders.end())
-            encoders.push_back(encoder);
+        for (const auto encoder: encoders)
+            encoder_names.append(KasmVideoEncoders::to_string(encoder)).append(" ");
+
+        slog.info("Using CLI-specified video codecs (supported subset): %s", encoder_names.c_str());
     }
-
-    std::string encoder_names;
-
-    for (auto encoder: encoders)
-        encoder_names.append(KasmVideoEncoders::to_string(encoder)).append(" ");
-
-    slog.info("Using CLI-specified video codecs (supported subset): %s", encoder_names.c_str());
 
     if (Server::selfBench)
         SelfBench();
