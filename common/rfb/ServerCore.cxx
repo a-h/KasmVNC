@@ -265,7 +265,7 @@ rfb::BoolParameter rfb::Server::printVideoArea
 rfb::IntParameter rfb::Server::videoQualityCRFCQP
 ("VideoQualityCRFCPQ",
  "The CRF/CPQ value to use when encoding video",
- 17, 0, 51);
+ 17, 0, 63);
 rfb::IntParameter rfb::Server::groupOfPicture
 ("GroupOfPicture",
  "The number of frames to group together for encoding",
