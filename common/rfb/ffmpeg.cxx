@@ -139,5 +139,5 @@ void FFmpeg::av_log_callback(void *ptr, int level, const char *fmt, va_list vl) 
 
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), fmt, vl);
-    vlog.info("[FFmpeg Debug] %s", buffer);
+    vlog.debug("[FFmpeg Debug] %s", buffer);
 }
