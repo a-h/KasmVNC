@@ -300,7 +300,7 @@ rfb::IntParameter rfb::Server::udpPort
 
 rfb::StringParameter rfb::Server::videoCodec
 ("videoCodec",
- "If set, use this codec to send a video stream for WebCodecs. Supported options: h264",
+ "If set, use this codec to send a video stream for WebCodecs. Supported options: auto, h264, h264_vaapi, h265, h265_vaapi, av1, av1_vaapi",
  "");
 
 static void bandwidthPreset() {
