@@ -30,7 +30,10 @@ builder/build.sh
 Now run Xvnc and Xfce4 from inside the container
 
 ```bash
-/src/xorg.build/bin/Xvnc -interface 0.0.0.0 -PublicIP 127.0.0.1 -disableBasicAuth -RectThreads 0 -Log *:stdout:100 -httpd /src/kasmweb/dist -sslOnly 0 -SecurityTypes None -websocketPort 6901 -FreeKeyMappings :1 &
+mkdir ~/.vnc
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout ${HOME}/.vnc/self.pem -out ${HOME}/.vnc/self.pem -subj "/C=US/ST=VA/L=None/O=None/OU=DoFu/CN=kasm/emailAddress=none@none.none"
+
+/src/xorg.build/bin/Xvnc -interface 0.0.0.0 -PublicIP 127.0.0.1 -disableBasicAuth -RectThreads 0 -Log *:stdout:100 -httpd /src/kasmweb/dist -sslOnly 1 -SecurityTypes None -websocketPort 6901 -FreeKeyMappings -cert ~/.vnc/self.pem -key ~/.vnc/self.pem -videoCodec h264 :1 &
 /usr/bin/xfce4-session --display :1
 ```
 
