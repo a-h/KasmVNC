@@ -2098,10 +2098,30 @@ sub DefineConfigToCLIConversion {
         ]
     }),
     KasmVNC::CliOption->new({
-        name => 'VideoBitRate',
+        name => 'videoCodec',
         configKeys => [
           KasmVNC::ConfigKey->new({
-            name => "encoding.video_encoding_mode.bitrate",
+            name => "encoding.video_streaming_mode.codec",
+            validator => KasmVNC::EnumValidator->new({
+              allowedValues => [qw(auto h264 h264_vaapi avc avc_vaapi h265 h265_vaapi hevc hevc_vaapi av1 av1_vaapi)]
+            })
+          })
+        ]
+    }),
+    KasmVNC::CliOption->new({
+        name => 'VideoQualityCRFCPQ',
+        configKeys => [
+          KasmVNC::ConfigKey->new({
+            name => "encoding.video_streaming_mode.quality",
+            type => KasmVNC::ConfigKey::INT
+          })
+        ]
+    }),
+    KasmVNC::CliOption->new({
+        name => 'GroupOfPicture',
+        configKeys => [
+          KasmVNC::ConfigKey->new({
+            name => "encoding.video_streaming_mode.video_codec",
             type => KasmVNC::ConfigKey::INT
           })
         ]
