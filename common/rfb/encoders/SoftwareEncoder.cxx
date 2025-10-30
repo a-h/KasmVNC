@@ -190,6 +190,16 @@ namespace rfb {
             vlog.info("Cannot set preset to ultrafast");
         }
 
+        if (encoder == KasmVideoEncoders::Encoder::av1_software) {
+            if (ffmpeg.av_opt_set(ctx->priv_data, "preset", "12", 0) < 0) {
+                vlog.info("Cannot set preset to 8");
+            }
+
+            if (ffmpeg.av_opt_set(ctx->priv_data, "svtav1-params", "rtc=1", 0) < 0) {
+                vlog.info("Cannot set -svtav1-params to tune=0");
+            }
+        }
+
         // start here, lower (20–22) = better quality,
         // higher (24–28) = lower bitrate
         if (ffmpeg.av_opt_set_int(ctx->priv_data, "crf", current_params.quality, 0) < 0) {
