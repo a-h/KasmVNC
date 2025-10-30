@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 source_dir=$(dirname "$0")
 "${source_dir}"/build-libjpeg-turbo
