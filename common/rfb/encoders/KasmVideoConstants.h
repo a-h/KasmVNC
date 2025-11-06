@@ -52,10 +52,10 @@ public:
     EnumRange(E begin, E end) :
         begin_iter(EnumIterator(begin)),
         end_iter(++EnumIterator(end)) {}
-    EnumIterator begin() const {
+    [[nodiscard]] EnumIterator begin() const {
         return begin_iter;
     }
-    EnumIterator end() const {
+    [[nodiscard]] EnumIterator end() const {
         return end_iter;
     }
     EnumIterator begin() {
