@@ -106,12 +106,12 @@ namespace rfb {
 
             fb_rect.setXYWH(0, 0, fb_width, fb_height);
 
-            for (auto &screen: screens) {
+            for (const auto &screen: screens) {
                 if (screen.dimensions.is_empty())
                     return false;
                 if (!screen.dimensions.enclosed_by(fb_rect))
                     return false;
-                if (seen_ids.find(screen.id) != seen_ids.end())
+                if (seen_ids.contains(screen.id))
                     return false;
                 seen_ids.insert(screen.id);
             }
