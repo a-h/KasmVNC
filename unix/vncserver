@@ -2121,7 +2121,7 @@ sub DefineConfigToCLIConversion {
         name => 'GroupOfPicture',
         configKeys => [
           KasmVNC::ConfigKey->new({
-            name => "encoding.video_streaming_mode.video_codec",
+            name => "encoding.video_streaming_mode.gop",
             type => KasmVNC::ConfigKey::INT
           })
         ]
