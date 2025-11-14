@@ -130,7 +130,9 @@ encoding:
       level: off
     scaling_algorithm: progressive_bilinear
     webp_encoding_time: 30
-    bitrate: 300
+
+  video_streaming_mode:
+    codec: auto
 
   compare_framebuffer: auto
   zrle_zlib_level: auto
