@@ -384,5 +384,4 @@ namespace rfb {
             return result;
         }
     };
-
 } // namespace rfb
