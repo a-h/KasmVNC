@@ -1,5 +1,7 @@
 #!/usr/bin/ruby
 
+which ruby
+
 package_name = ARGV.first
 
 DEB_PACKAGE_REGEX = %r!(?<os>[^/]+)/kasmvncserver_.+?_(?<arch>.+?).(?<format>deb)!
