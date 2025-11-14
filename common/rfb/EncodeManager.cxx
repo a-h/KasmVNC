@@ -438,8 +438,6 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     writeCopyPassRects(copypassed);
 
     if (video_mode_available && conn->cp.encoder != KasmVideoEncoders::Encoder::unavailable) {
-
-        auto begin = msSince(&start);
         auto *screen_encoder_manager = dynamic_cast<ScreenEncoderManager<> *>(encoders[encoderKasmVideo]);
         if (screen_encoder_manager) {
             if (screen_encoder_manager->get_encoder() != conn->cp.encoder) {
