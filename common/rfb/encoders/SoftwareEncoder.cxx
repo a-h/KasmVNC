@@ -126,6 +126,7 @@ namespace rfb {
 
     void SoftwareEncoder::writeSkipRect() {
         auto *os = conn->getOutStream(conn->cp.supportsUdp);
+        os->writeU8(layout.id);
         os->writeU8(kasmVideoSkip);
     }
 
