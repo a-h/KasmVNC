@@ -58,7 +58,7 @@ extern rfb::BoolParameter disablebasicauth;
 
 extern "C" char unixrelaynames[MAX_UNIX_RELAYS][MAX_UNIX_RELAY_NAME_LEN];
 
-VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
+VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s, const video_encoders::EncoderProbe &encoder_probe,
                                    bool reverse)
   : upgradingToUdp(false), sock(s), reverseConnection(reverse),
     inProcessMessages(false),
@@ -67,7 +67,7 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
     losslessTimer(this), kbdLogTimer(this), binclipTimer(this),
     server(server_), updates(false),
     updateRenderedCursor(false), removeRenderedCursor(false),
-    continuousUpdates(false), encodeManager(this, &VNCServerST::encCache, FFmpeg::get()),
+    continuousUpdates(false), encodeManager(this, &VNCServerST::encCache, FFmpeg::get(), encoder_probe),
     needsPermCheck(false), pointerEventTime(0),
     clientHasCursor(false),
     accessRights(AccessDefault), startTime(time(nullptr)), frameTracking(false),
@@ -115,7 +115,7 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
   gettimeofday(&lastClipboardOp, nullptr);
   gettimeofday(&lastKeyEvent, nullptr);
 
-  cp.available_encoders = video_encoders::available_encoders;
+  cp.available_encoders = encoder_probe.get_available_encoders();
 
   server->clients.push_front(this);
 

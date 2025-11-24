@@ -7,41 +7,43 @@
 namespace rfb::video_encoders {
     class EncoderProbe {
         KasmVideoEncoders::Encoder best_encoder{KasmVideoEncoders::Encoder::h264_software};
-        std::vector<KasmVideoEncoders::Encoder> available_encoders;
-        std::string_view drm_device_path;
+        KasmVideoEncoders::Encoders available_encoders;
+        std::string drm_device_path;
         FFmpeg &ffmpeg;
 
-        explicit EncoderProbe(FFmpeg &ffmpeg);
-        void probe();
+        explicit EncoderProbe(FFmpeg &ffmpeg, const std::vector<std::string_view> &parsed_encoders, const char *dri_node);
+        KasmVideoEncoders::Encoders probe(const char *dri_node);
+
     public:
         EncoderProbe(const EncoderProbe &) = delete;
         EncoderProbe &operator=(const EncoderProbe &) = delete;
         EncoderProbe(EncoderProbe &&) = delete;
         EncoderProbe &operator=(EncoderProbe &&) = delete;
 
-        static EncoderProbe &get(FFmpeg &ffmpeg) {
-            static EncoderProbe instance{ffmpeg};
+        static EncoderProbe &get(FFmpeg &ffmpeg, const std::vector<std::string_view> &parsed_encoders, const char *dri_node) {
+            static EncoderProbe instance{ffmpeg, parsed_encoders, dri_node};
 
             return instance;
         }
 
         // [[nodiscard]] static bool is_acceleration_available();
 
-        [[nodiscard]] KasmVideoEncoders::Encoder select_best_encoder() const {
+        [[nodiscard]] KasmVideoEncoders::Encoder get_best_encoder() const {
             return best_encoder;
         }
 
-        [[nodiscard]] const std::vector<KasmVideoEncoders::Encoder> &get_available_encoders() const {
+        [[nodiscard]] const KasmVideoEncoders::Encoders &get_available_encoders() const {
             return available_encoders;
         }
 
-        [[nodiscard]] std::string_view get_drm_device_path() const {
-            return drm_device_path;
+        [[nodiscard]] const KasmVideoEncoders::Encoders &update_encoders(const std::vector<std::string_view> &codecs) {
+            available_encoders = SupportedVideoEncoders::filter_available_encoders(SupportedVideoEncoders::map_encoders(codecs), available_encoders);
+            return available_encoders;
+        }
+
+        [[nodiscard]] const char *get_drm_device_path() const {
+            return drm_device_path.c_str();
         }
     };
-
-    extern const std::vector<KasmVideoEncoders::Encoder>& available_encoders; // = EncoderProbe::get(FFmpeg::get()).get_available_encoders();
-    extern const KasmVideoEncoders::Encoder best_encoder; // = EncoderProbe::get(FFmpeg::get()).select_best_encoder();
-    extern const std::string_view drm_device_path; // = EncoderProbe::get(FFmpeg::get()).get_drm_device_path();
 
 } // namespace rfb::video_encoders

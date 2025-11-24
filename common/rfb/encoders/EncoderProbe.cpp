@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <vector>
 #include "KasmVideoConstants.h"
+#include <rfb/LogWriter.h>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -13,9 +14,7 @@ extern "C" {
 #include "rfb/ffmpeg.h"
 
 namespace rfb::video_encoders {
-    const std::vector<KasmVideoEncoders::Encoder> &available_encoders = EncoderProbe::get(FFmpeg::get()).get_available_encoders();
-    const KasmVideoEncoders::Encoder best_encoder = EncoderProbe::get(FFmpeg::get()).select_best_encoder();
-    const std::string_view drm_device_path = EncoderProbe::get(FFmpeg::get()).get_drm_device_path();
+    static LogWriter vlog("EncoderProbe");
 
     struct EncoderCandidate {
         KasmVideoEncoders::Encoder encoder;
@@ -35,19 +34,37 @@ namespace rfb::video_encoders {
         }
     };
 
-    EncoderProbe::EncoderProbe(FFmpeg &ffmpeg_) :
+    EncoderProbe::EncoderProbe(FFmpeg &ffmpeg_, const std::vector<std::string_view> &parsed_encoders, const char *dri_node) :
         ffmpeg(ffmpeg_) {
         if (!ffmpeg.is_available()) {
             available_encoders.push_back(KasmVideoEncoders::Encoder::unavailable);
-        } else
-            probe();
+        } else {
+            auto debug_encoders = [] (const char *msg, const KasmVideoEncoders::Encoders &encoders) {
+                std::string encoder_names;
 
+                for (const auto encoder: encoders)
+                    encoder_names.append(KasmVideoEncoders::to_string(encoder)).append(" ");
+
+                if (!encoder_names.empty())
+                    vlog.debug("%s: %s",msg, encoder_names.c_str());
+            };
+
+            const auto encoders = SupportedVideoEncoders::map_encoders(parsed_encoders);
+            debug_encoders("CLI-specified video codecs", encoders);
+
+            available_encoders = probe(dri_node);
+            debug_encoders("Available encoders", available_encoders);
+
+            available_encoders = SupportedVideoEncoders::filter_available_encoders(encoders, available_encoders);
+            debug_encoders("Using CLI-specified video codecs (supported subset)", available_encoders);
+        }
 
         available_encoders.shrink_to_fit();
         best_encoder = available_encoders.front();
     }
 
-    void EncoderProbe::probe() {
+    KasmVideoEncoders::Encoders EncoderProbe::probe(const char *dri_node) {
+        KasmVideoEncoders::Encoders result{};
         for (const auto &encoder_candidate: candidates) {
             const AVCodec *codec = ffmpeg.avcodec_find_encoder_by_name(KasmVideoEncoders::to_string(encoder_candidate.encoder));
             if (!codec || codec->type != AVMEDIA_TYPE_VIDEO)
@@ -61,35 +78,50 @@ namespace rfb::video_encoders {
                 AVBufferRef *hw_ctx{};
                 hw_ctx_guard.reset(hw_ctx);
 
-                for (const auto *drm_dev_path: drm_device_paths) {
-                    const auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, drm_dev_path, nullptr, 0);
-                    if (err < 0) {
-                        puts(ffmpeg.get_error_description(err).c_str());
+                if (dri_node) {
+                    const auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, dri_node, nullptr, 0);
+                    if (err == 0) {
+                        drm_device_path = dri_node;
+                        result.push_back(encoder_candidate.encoder);
+                    } else
+                        vlog.error("%s", ffmpeg.get_error_description(err).c_str());
 
-                        continue;
-                    }
-                    drm_device_path = drm_dev_path;
+                } else {
+                    vlog.debug("Trying to open all DRM devices");
+                    for (const auto *drm_dev_path: drm_device_paths) {
+                        const auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, drm_dev_path, nullptr, 0);
+                        if (err < 0) {
+                            vlog.error("%s", ffmpeg.get_error_description(err).c_str());
 
-                    if (encoder_candidate.hw_type == AV_HWDEVICE_TYPE_VAAPI) {
-                        printf("DEBUG: Codec: %s\n", codec->name);
-                        const FFmpeg::ContextGuard ctx_guard{ffmpeg.avcodec_alloc_context3(codec)};
-
-                        const AVOption *opt{};
-                        while (opt = ffmpeg.av_opt_next(ctx_guard->priv_data, opt), opt) {
-                            printf("DEBUG: Option: %s.%s (help: %s)\n", codec->name, opt->name, opt->help ? opt->help : "n/a");
+                            continue;
                         }
+                        drm_device_path = drm_dev_path;
+
+                        vlog.info("Found DRM device %s", drm_dev_path);
+
+                        if (encoder_candidate.hw_type == AV_HWDEVICE_TYPE_VAAPI) {
+                            vlog.debug("DEBUG: Codec: %s\n", codec->name);
+                            const FFmpeg::ContextGuard ctx_guard{ffmpeg.avcodec_alloc_context3(codec)};
+
+                            const AVOption *opt{};
+                            while (opt = ffmpeg.av_opt_next(ctx_guard->priv_data, opt), opt) {
+                                vlog.debug("DEBUG: Option: %s.%s (help: %s)\n", codec->name, opt->name, opt->help ? opt->help : "n/a");
+                            }
+                        }
+
+                        result.push_back(encoder_candidate.encoder);
+
+                        break;
                     }
-
-                    available_encoders.push_back(encoder_candidate.encoder);
-
-                    break;
                 }
             }
         }
 
-        available_encoders.push_back(KasmVideoEncoders::Encoder::h264_software);
-        available_encoders.push_back(KasmVideoEncoders::Encoder::h265_software);
-        // available_encoders.push_back(KasmVideoEncoders::Encoder::av1_software);
+        result.push_back(KasmVideoEncoders::Encoder::h264_software);
+        result.push_back(KasmVideoEncoders::Encoder::h265_software);
+        // result.push_back(KasmVideoEncoders::Encoder::av1_software);
+
+        return result;
     }
 
     /*bool EncoderProbe::is_acceleration_available() {

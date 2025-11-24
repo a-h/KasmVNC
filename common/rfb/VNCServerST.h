@@ -36,6 +36,7 @@
 #include <rfb/Timer.h>
 #include <rfb/VNCServer.h>
 #include <rfb/encoders/KasmVideoConstants.h>
+#include <rfb/encoders/EncoderProbe.h>
 #include <string>
 
 namespace rfb {
@@ -53,7 +54,7 @@ namespace rfb {
     // -=- Constructors
 
     //   Create a server exporting the supplied desktop.
-    VNCServerST(const char* name_, SDesktop* desktop_);
+    VNCServerST(const char* name_, SDesktop* desktop_, const video_encoders::EncoderProbe &encoder_probe);
     virtual ~VNCServerST();
 
 
@@ -238,7 +239,6 @@ namespace rfb {
     std::list<network::Socket*> closingSockets;
 
     static EncCache encCache;
-    std::vector<KasmVideoEncoders::Encoder> encoders{};
 
     ComparingUpdateTracker* comparer;
 
@@ -302,6 +302,7 @@ namespace rfb {
                           rdr::U8 &trackingFrameStats, char trackingClient[]);
 
     bool sendWatermark;
+    const video_encoders::EncoderProbe &encoder_probe;
   };
 
 };

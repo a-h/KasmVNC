@@ -167,9 +167,10 @@ static void updateMaxVideoRes(uint16_t *x, uint16_t *y) {
   }
 }
 
-EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmpeg& ffmpeg_) :
+EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmpeg& ffmpeg_, const video_encoders::EncoderProbe &encoder_probe_) :
     conn(conn_), dynamicQualityMin(-1), dynamicQualityOff(-1), areaCur(0), videoDetected(false), videoTimer(this),
-    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), ffmpeg(ffmpeg_), ffmpeg_available(ffmpeg.is_available()), encCache(encCache_)
+    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), ffmpeg(ffmpeg_), ffmpeg_available(ffmpeg.is_available()),
+    encoder_probe(encoder_probe_), encCache(encCache_)
 {
     encoders.resize(encoderClassMax, nullptr);
     activeEncoders.resize(encoderTypeMax, encoderRaw);
@@ -184,15 +185,18 @@ EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmp
     encoders[encoderZRLE] = new ZRLEEncoder(conn);
 
     if (ffmpeg_available) {
+        const VideoEncoderParams encoder_params = {conn_->cp.width,
+            conn_->cp.height,
+            static_cast<uint8_t>(Server::frameRate),
+            static_cast<uint8_t>(Server::groupOfPicture),
+            static_cast<uint8_t>(Server::videoQualityCRFCQP)};
+
         encoders[encoderKasmVideo] = new ScreenEncoderManager(ffmpeg,
-                                                              video_encoders::best_encoder,
-                                                              video_encoders::available_encoders,
-                                                              conn,
-                                                              {conn_->cp.width,
-                                                               conn_->cp.height,
-                                                               static_cast<uint8_t>(Server::frameRate),
-                                                               static_cast<uint8_t>(Server::groupOfPicture),
-                                                               static_cast<uint8_t>(Server::videoQualityCRFCQP)});
+            encoder_probe.get_best_encoder(),
+            encoder_probe.get_available_encoders(),
+            conn,
+            encoder_probe.get_drm_device_path(),
+            encoder_params);
     }
 
     video_mode_available = ffmpeg_available && Server::videoCodec[0];
@@ -443,15 +447,18 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
             if (screen_encoder_manager->get_encoder() != conn->cp.encoder) {
                 delete encoders[encoderKasmVideo];
 
+                const VideoEncoderParams encoder_params = {0,
+                    0,
+                    static_cast<uint8_t>(Server::frameRate),
+                    static_cast<uint8_t>(Server::groupOfPicture),
+                    static_cast<uint8_t>(Server::videoQualityCRFCQP)};
+
                 encoders[encoderKasmVideo] = new ScreenEncoderManager(ffmpeg,
-                                                              conn->cp.encoder,
-                                                              video_encoders::available_encoders,
-                                                              conn,
-                                                              {0,
-                                                               0,
-                                                               static_cast<uint8_t>(Server::frameRate),
-                                                               static_cast<uint8_t>(Server::groupOfPicture),
-                                                               static_cast<uint8_t>(Server::videoQualityCRFCQP)});
+                    conn->cp.encoder,
+                    encoder_probe.get_available_encoders(),
+                    conn,
+                    encoder_probe.get_drm_device_path(),
+                    encoder_params);
             }
             screen_encoder_manager->sync_layout(layout);
 

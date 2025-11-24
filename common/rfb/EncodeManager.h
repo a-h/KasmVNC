@@ -36,6 +36,7 @@
 
 #include "ScreenSet.h"
 #include "ffmpeg.h"
+#include <rfb/encoders/EncoderProbe.h>
 
 enum startRectOverride {
   STARTRECT_NO_OVERRIDE,
@@ -58,7 +59,7 @@ namespace rfb {
 
   class EncodeManager: public Timer::Callback {
   public:
-    EncodeManager(SConnection* conn, EncCache *encCache, const FFmpeg& ffmpeg);
+    EncodeManager(SConnection* conn, EncCache *encCache, const FFmpeg& ffmpeg, const video_encoders::EncoderProbe &encoder_probe_);
     ~EncodeManager() override;
 
     void logStats();
@@ -219,6 +220,7 @@ namespace rfb {
     const FFmpeg &ffmpeg;
     bool ffmpeg_available;
     bool video_mode_available{false};
+    const video_encoders::EncoderProbe &encoder_probe;
 
     EncCache *encCache;
 

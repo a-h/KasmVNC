@@ -37,6 +37,7 @@
 #include <rfb/VNCServerST.h>
 #include <unixcommon.h>
 #include "Input.h"
+#include <rfb/encoders/EncoderProbe.h>
 
 namespace rfb {
   class VNCServerST;
@@ -52,7 +53,7 @@ public:
   XserverDesktop(int screenIndex,
                  std::list<network::SocketListener*> listeners_,
                  const char* name, const rfb::PixelFormat &pf,
-                 int width, int height, void* fbptr, int stride);
+                 int width, int height, void* fbptr, int stride, const rfb::video_encoders::EncoderProbe &probe);
   virtual ~XserverDesktop();
 
   // methods called from X server code

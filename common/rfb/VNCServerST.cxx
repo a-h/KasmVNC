@@ -135,7 +135,7 @@ static void parseRegionPart(const bool percents, rdr::U16 &pcdest, int &dest,
   *inptr = ptr;
 }
 
-VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
+VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_, const video_encoders::EncoderProbe &encoder_probe_)
   : blHosts(&blacklist), desktop(desktop_), desktopStarted(false),
     blockCounter(0), pb(nullptr), blackedpb(nullptr), ledState(ledUnknown),
     name(strDup(name_)), pointerClient(nullptr), clipboardClient(nullptr),
@@ -144,7 +144,7 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
     queryConnectionHandler(nullptr), keyRemapper(&KeyRemapper::defInstance),
     lastConnectionTime(0), disableclients(false),
     frameTimer(this), apimessager(nullptr), trackingFrameStats(0),
-    clipboardId(0), sendWatermark(false)
+    clipboardId(0), sendWatermark(false), encoder_probe(encoder_probe_)
 {
     auto to_string = [](const bool value) {
         return value ? "yes" : "no";
@@ -159,7 +159,7 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
               to_string(cpu_info::has_avx512f));
 
     std::string available_accelerators{};
-    for (const auto encoder: video_encoders::available_encoders) {
+    for (const auto encoder: encoder_probe.get_available_encoders()) {
         if (KasmVideoEncoders::is_accelerated(encoder)) {
             if (!available_accelerators.empty())
                 available_accelerators.append(", ");
@@ -254,24 +254,6 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
     if (watermarkData)
         sendWatermark = true;
 
-    const char *codec_cli_arg = Server::videoCodec;
-    if (codec_cli_arg[0]) {
-        const auto parsed_codecs = SupportedVideoEncoders::parse(codec_cli_arg);
-        for (auto codec: parsed_codecs) {
-            if (!SupportedVideoEncoders::is_supported(codec))
-                throw std::invalid_argument(fmt::format("Unknown video codec: {}", codec));
-        }
-
-        encoders = SupportedVideoEncoders::filter_available_encoders(SupportedVideoEncoders::map_encoders(parsed_codecs), video_encoders::available_encoders);
-
-        std::string encoder_names;
-
-        for (const auto encoder: encoders)
-            encoder_names.append(KasmVideoEncoders::to_string(encoder)).append(" ");
-
-        slog.info("Using CLI-specified video codecs (supported subset): %s", encoder_names.c_str());
-    }
-
     if (Server::selfBench)
         SelfBench();
 
@@ -333,7 +315,7 @@ void VNCServerST::addSocket(network::Socket* sock, bool outgoing)
     lastConnectionTime = time(0);
   }
 
-  VNCSConnectionST* client = new VNCSConnectionST(this, sock, outgoing);
+  VNCSConnectionST* client = new VNCSConnectionST(this, sock, encoder_probe, outgoing);
   client->init();
 
   if (watermarkData)

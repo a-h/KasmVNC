@@ -27,6 +27,7 @@ class FFMPEGVAAPIEncoder final : public Encoder, public VideoEncoder {
 
     int64_t pts{};
     int bpp{};
+    const char *dri_node{};
 
     static void write_compact(rdr::OutStream *os, int value);
     [[nodiscard]] bool init(int width, int height, VideoEncoderParams params);
@@ -34,7 +35,7 @@ class FFMPEGVAAPIEncoder final : public Encoder, public VideoEncoder {
     template<typename T>
     friend class EncoderBuilder;
     FFMPEGVAAPIEncoder(Screen layout, const FFmpeg &ffmpeg, SConnection *conn, KasmVideoEncoders::Encoder encoder,
-                           VideoEncoderParams params);
+        const char *dri_node, VideoEncoderParams params);
 
 public:
     bool isSupported() const override;

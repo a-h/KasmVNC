@@ -16,15 +16,15 @@ extern "C" {
 static rfb::LogWriter vlog("FFMPEGVAAPIEncoder");
 
 namespace rfb {
-    FFMPEGVAAPIEncoder::FFMPEGVAAPIEncoder(Screen layout_, const FFmpeg &ffmpeg_, SConnection *conn,
-                                                   KasmVideoEncoders::Encoder encoder_, VideoEncoderParams params) :
-        Encoder(layout_.id, conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), layout(layout_),
-        ffmpeg(ffmpeg_), encoder(encoder_), current_params(params), msg_codec_id(KasmVideoEncoders::to_msg_id(encoder)) {
+    FFMPEGVAAPIEncoder::FFMPEGVAAPIEncoder(Screen layout_, const FFmpeg &ffmpeg_, SConnection *conn, KasmVideoEncoders::Encoder encoder_,
+        const char *dri_node_, VideoEncoderParams params) :
+    Encoder(layout_.id, conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), layout(layout_),
+        ffmpeg(ffmpeg_), encoder(encoder_), current_params(params), msg_codec_id(KasmVideoEncoders::to_msg_id(encoder)),
+        dri_node(dri_node_) {
         AVBufferRef *hw_device_ctx{};
         int err{};
 
-        if (err = ffmpeg.av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, video_encoders::drm_device_path.data(), nullptr, 0);
-            err < 0) {
+        if (err = ffmpeg.av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, dri_node_, nullptr, 0); err < 0) {
             throw std::runtime_error(fmt::format("Failed to create VAAPI device context {}", ffmpeg.get_error_description(err)));
         }
 
@@ -32,7 +32,7 @@ namespace rfb {
         const auto *enc_name = KasmVideoEncoders::to_string(encoder);
         codec = ffmpeg.avcodec_find_encoder_by_name(enc_name);
         if (!codec)
-            throw std::runtime_error(fmt::format("Could not find {} encoder",  enc_name));
+            throw std::runtime_error(fmt::format("Could not find {} encoder", enc_name));
 
         auto *frame = ffmpeg.av_frame_alloc();
         if (!frame)

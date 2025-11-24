@@ -35,6 +35,7 @@
 #include <rfb/Timer.h>
 #include <rfb/unixRelayLimits.h>
 
+#include <rfb/encoders/EncoderProbe.h>
 #include "kasmpasswd.h"
 
 namespace rfb {
@@ -43,7 +44,7 @@ namespace rfb {
   class VNCSConnectionST : public SConnection,
                            public Timer::Callback {
   public:
-    VNCSConnectionST(VNCServerST* server_, network::Socket* s, bool reverse);
+    VNCSConnectionST(VNCServerST* server_, network::Socket* s, const video_encoders::EncoderProbe &encoder_probe, bool reverse);
     virtual ~VNCSConnectionST();
 
     // Methods called from VNCServerST.  None of these methods ever knowingly

@@ -33,7 +33,6 @@
 #include <rfb/util.h>
 #include <rfb/ServerCore.h>
 #include <rdr/HexOutStream.h>
-#include <rfb/LogWriter.h>
 #include <rfb/Hostname.h>
 #include <rfb/Region.h>
 #include <rfb/ledStates.h>
@@ -42,13 +41,15 @@
 #include <network/TcpSocket.h>
 #include <network/UnixSocket.h>
 
-#include "XserverDesktop.h"
-#include "vncExtInit.h"
-#include "vncHooks.h"
-#include "vncBlockHandler.h"
-#include "vncSelection.h"
-#include "XorgGlue.h"
+#include <rfb/encoders/EncoderProbe.h>
 #include "RandrGlue.h"
+#include "XorgGlue.h"
+#include "XserverDesktop.h"
+#include "vncBlockHandler.h"
+#include "vncExtInit.h"
+#include <fmt/format.h>
+#include "vncHooks.h"
+#include "vncSelection.h"
 #include "xorg-version.h"
 
 extern "C" {
@@ -306,6 +307,18 @@ void vncExtensionInit(void)
         CharArray desktopNameStr(desktopName.getData());
         PixelFormat pf = vncGetPixelFormat(scr);
 
+        std::vector<std::string_view> parsed_codecs;
+        const char *codec_cli_arg = Server::videoCodec;
+        if (codec_cli_arg[0]) {
+            parsed_codecs = SupportedVideoEncoders::parse(codec_cli_arg);
+            for (auto codec: parsed_codecs) {
+                vlog.debug("CODEC:  %s" , std::string(codec).c_str()) ;
+                if (!SupportedVideoEncoders::is_supported(codec))
+                    throw std::invalid_argument(fmt::format("Unknown video codec: {}", codec));
+            }
+        }
+        const auto &probe = video_encoders::EncoderProbe::get(FFmpeg::get(), parsed_codecs, Server::driNode.getData());
+
         vncSetGlueContext(scr);
         desktop[scr] = new XserverDesktop(scr,
                                           listeners,
@@ -314,7 +327,8 @@ void vncExtensionInit(void)
                                           vncGetScreenWidth(),
                                           vncGetScreenHeight(),
                                           vncFbptr[scr],
-                                          vncFbstride[scr]);
+                                          vncFbstride[scr],
+                                          probe);
         vlog.info("created VNC server for screen %d", scr);
 
         if (scr == 0 && vncInetdSock != -1 && listeners.empty()) {

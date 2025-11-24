@@ -22,6 +22,7 @@ namespace rfb {
 
         KasmVideoEncoders::Encoder base_video_encoder;
         std::vector<KasmVideoEncoders::Encoder> available_encoders;
+        const char *dri_node{};
 
         Encoder *add_encoder(const Screen &layout) const;
         void add_screen(uint8_t index, const Screen &layout);
@@ -48,8 +49,7 @@ namespace rfb {
         }
 
         explicit ScreenEncoderManager(const FFmpeg &ffmpeg_, KasmVideoEncoders::Encoder encoder,
-                                      const std::vector<KasmVideoEncoders::Encoder> &encoders, SConnection *conn,
-                                      VideoEncoderParams params);
+            const std::vector<KasmVideoEncoders::Encoder> &encoders, SConnection *conn, const char *dri_node, VideoEncoderParams params);
         ~ScreenEncoderManager() override;
 
         ScreenEncoderManager(const ScreenEncoderManager &) = delete;

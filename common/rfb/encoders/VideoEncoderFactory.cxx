@@ -30,7 +30,10 @@ namespace rfb {
         KasmVideoEncoders::Encoder encoder{};
         VideoEncoderParams params{};
         SConnection *conn{};
-        explicit EncoderBuilder(const FFmpeg *ffmpeg_) : ffmpeg(ffmpeg_) {
+        const char *dri_node{};
+
+        explicit EncoderBuilder(const FFmpeg *ffmpeg_) :
+            ffmpeg(ffmpeg_) {
             layout.id = INVALID_ID;
         }
         EncoderBuilder() = default;
@@ -74,6 +77,12 @@ namespace rfb {
             return *this;
         }
 
+        EncoderBuilder &with_dri_node(const char *path) {
+            dri_node = path;
+
+            return *this;
+        }
+
         Encoder *build() override {
             if (layout.id == INVALID_ID)
                 throw std::runtime_error("Encoder does not have a valid id");
@@ -85,7 +94,10 @@ namespace rfb {
                 if (!ffmpeg)
                     throw std::runtime_error("FFmpeg is required");
 
-                return new T(layout, *ffmpeg, conn, encoder, params);
+                if constexpr (std::is_same_v<T, FFMPEGVAAPIEncoder>) {
+                    return new T(layout, *ffmpeg, conn, encoder, dri_node, params);
+                } else
+                    return new T(layout, *ffmpeg, conn, encoder, params);
             } else {
                 return new T(conn, encoder, params);
             }
@@ -97,7 +109,7 @@ namespace rfb {
     using SoftwareEncoderBuilder = EncoderBuilder<SoftwareEncoder>;
 
     Encoder *create_encoder(const Screen &layout, const FFmpeg *ffmpeg, SConnection *conn, KasmVideoEncoders::Encoder video_encoder,
-                            VideoEncoderParams params) {
+        const char *dri_node, VideoEncoderParams params) {
         switch (video_encoder) {
             case KasmVideoEncoders::Encoder::h264_vaapi:
             case KasmVideoEncoders::Encoder::h265_vaapi:
@@ -108,22 +120,23 @@ namespace rfb {
             case KasmVideoEncoders::Encoder::h265_ffmpeg_vaapi:
             case KasmVideoEncoders::Encoder::av1_ffmpeg_vaapi:
                 return FFMPEGVAAPIEncoderBuilder::create(ffmpeg)
-                        .with_layout(layout)
-                        .with_connection(conn)
-                        .with_encoder(video_encoder)
-                        .with_params(params)
-                        .build();
+                    .with_layout(layout)
+                    .with_connection(conn)
+                    .with_encoder(video_encoder)
+                    .with_params(params)
+                    .with_dri_node(dri_node)
+                    .build();
             case KasmVideoEncoders::Encoder::h264_nvenc:
             case KasmVideoEncoders::Encoder::h265_nvenc:
             case KasmVideoEncoders::Encoder::av1_nvenc:
                 throw std::runtime_error("NVENC is not supported yet");
             default:
                 return SoftwareEncoderBuilder::create(ffmpeg)
-                        .with_layout(layout)
-                        .with_connection(conn)
-                        .with_encoder(video_encoder)
-                        .with_params(params)
-                        .build();
+                    .with_layout(layout)
+                    .with_connection(conn)
+                    .with_encoder(video_encoder)
+                    .with_params(params)
+                    .build();
         }
     }
 } // namespace rfb

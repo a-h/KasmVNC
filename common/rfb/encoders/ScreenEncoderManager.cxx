@@ -8,10 +8,12 @@
 namespace rfb {
     template<int T>
     ScreenEncoderManager<T>::ScreenEncoderManager(const FFmpeg &ffmpeg_, KasmVideoEncoders::Encoder encoder,
-                                               const std::vector<KasmVideoEncoders::Encoder> &encoders, SConnection *conn,
-                                               VideoEncoderParams params) :
-        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1), ffmpeg(ffmpeg_),
-        current_params(params), base_video_encoder(encoder), available_encoders(encoders) {}
+        const std::vector<KasmVideoEncoders::Encoder> &encoders, SConnection *conn, const char *dri_node, VideoEncoderParams params) :
+        Encoder(conn, encodingKasmVideo, static_cast<EncoderFlags>(EncoderUseNativePF | EncoderLossy), -1),
+        ffmpeg(ffmpeg_),
+        current_params(params),
+        base_video_encoder(encoder),
+        available_encoders(encoders) {}
 
     template<int T>
     ScreenEncoderManager<T>::~ScreenEncoderManager() {
@@ -23,12 +25,12 @@ namespace rfb {
     Encoder *ScreenEncoderManager<T>::add_encoder(const Screen &layout) const {
         Encoder *encoder{};
         try {
-            encoder = create_encoder(layout, &ffmpeg, conn, base_video_encoder, current_params);
+            encoder = create_encoder(layout, &ffmpeg, conn, base_video_encoder, dri_node, current_params);
         } catch (const std::exception &e) {
             if (base_video_encoder != KasmVideoEncoders::Encoder::h264_software) {
                 vlog.error("Attempting fallback to software encoder due to error: %s", e.what());
                 try {
-                    encoder = create_encoder(layout, &ffmpeg, conn, KasmVideoEncoders::Encoder::h264_software, current_params);
+                    encoder = create_encoder(layout, &ffmpeg, conn, KasmVideoEncoders::Encoder::h264_software, nullptr, current_params);
                 } catch (const std::exception &exception) {
                     vlog.error("Failed to create software encoder: %s", exception.what());
                 }

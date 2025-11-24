@@ -142,7 +142,7 @@ namespace benchmarking {
         MockStream udps{};
 
         EncCache cache{};
-        EncodeManager manager{this, &cache, FFmpeg::get()};
+        EncodeManager manager{this, &cache, FFmpeg::get(), video_encoders::EncoderProbe::get(FFmpeg::get(), {}, nullptr)};
     };
 
     class MockCConnection final : public MockTestConnection {
