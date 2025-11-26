@@ -47,6 +47,7 @@ RUN \
     mesa-dev \
     mesa-dri-gallium \
     mesa-va-gallium \
+    intel-media-driver \
     meson \
     nettle-dev \
     openssl-dev \
