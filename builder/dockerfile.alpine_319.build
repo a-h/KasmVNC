@@ -46,6 +46,7 @@ RUN \
     libva-dev \
     mesa-dev \
     mesa-dri-gallium \
+    mesa-va-gallium \
     meson \
     nettle-dev \
     openssl-dev \

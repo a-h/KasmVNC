@@ -45,6 +45,7 @@ RUN \
     libxshmfence-dev \
     libxtst-dev \
     mesa-dev \
+    mesa-va-gallium \
     mesa-dri-gallium \
     meson \
     nettle-dev \
