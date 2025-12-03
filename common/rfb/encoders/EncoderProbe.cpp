@@ -60,7 +60,10 @@ namespace rfb::video_encoders {
         }
 
         available_encoders.shrink_to_fit();
-        best_encoder = available_encoders.front();
+        if (available_encoders.empty())
+            best_encoder = KasmVideoEncoders::Encoder::unavailable;
+        else
+            best_encoder = available_encoders.front();
     }
 
     KasmVideoEncoders::Encoders EncoderProbe::probe(const char *dri_node) {
