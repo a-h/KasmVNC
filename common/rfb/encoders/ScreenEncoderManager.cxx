@@ -5,10 +5,7 @@
 #include <rfb/SMsgWriter.h>
 #include <rfb/encodings.h>
 #include <tbb/parallel_for_each.h>
-#include "ScreenEncoderManager.h"
-
 #include <sys/stat.h>
-
 #include "VideoEncoder.h"
 #include "VideoEncoderFactory.h"
 
