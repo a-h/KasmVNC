@@ -5,6 +5,7 @@
 #include <rfb/SMsgWriter.h>
 #include <rfb/encodings.h>
 #include <sys/stat.h>
+#include <mutex>
 #include <tbb/parallel_for_each.h>
 #include "VideoEncoder.h"
 #include "VideoEncoderFactory.h"
@@ -51,12 +52,6 @@ namespace rfb {
 
     template<uint8_t T>
     bool ScreenEncoderManager<T>::add_screen(uint8_t index, const Screen &layout) {
-        printf("SCREEN ADDED: %d (%d, %d, %d, %d)\n",
-            index,
-            layout.dimensions.tl.x,
-            layout.dimensions.tl.y,
-            layout.dimensions.br.x,
-            layout.dimensions.br.y);
         auto *encoder = add_encoder(layout);
         if (!encoder)
             return false;
@@ -184,13 +179,17 @@ namespace rfb {
             tbb::parallel_for_each(screens_to_refresh.begin(), screens_to_refresh.end(), [this, pb, &send_frame](uint8_t index) {
                 auto &screen = screens[index];
                 if (auto *encoder = screen.encoder; encoder) {
-                    if (encoder->render(pb)) {
-                        screen.dirty = false;
-                        std::lock_guard lock(conn_mutex);
-                        send_frame(screen);
-                    }
+                    screen.dirty = encoder->render(pb);
                 }
             });
+
+            for (auto index: screens_to_refresh) {
+                auto &screen = screens[index];
+                if (screen.dirty) {
+                    send_frame(screen);
+                    screen.dirty = false;
+                }
+            }
         } else {
             if (auto encoder = screens[head].encoder; encoder) {
                 if (encoder->render(pb))
