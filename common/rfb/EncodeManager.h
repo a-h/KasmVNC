@@ -106,6 +106,9 @@ namespace rfb {
                   const ScreenSet &layout,
                   const PixelBuffer* pb,
                   const RenderedCursor* renderedCursor);
+
+    bool updateVideo(const Region& changed, const ScreenSet &layout, const PixelBuffer* pb);
+
     void prepareEncoders(bool allowLossy);
 
     Region getLosslessRefresh(const Region& req, size_t maxUpdateSize);

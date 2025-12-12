@@ -185,18 +185,16 @@ EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmp
     encoders[encoderZRLE] = new ZRLEEncoder(conn);
 
     if (ffmpeg_available) {
-        const VideoEncoderParams encoder_params = {conn_->cp.width,
-            conn_->cp.height,
-            static_cast<uint8_t>(Server::frameRate),
-            static_cast<uint8_t>(Server::groupOfPicture),
-            static_cast<uint8_t>(Server::videoQualityCRFCQP)};
-
         encoders[encoderKasmVideo] = new ScreenEncoderManager(ffmpeg,
             encoder_probe.get_best_encoder(),
             encoder_probe.get_available_encoders(),
             conn,
             encoder_probe.get_drm_device_path(),
-            encoder_params);
+            {conn_->cp.width,
+                conn_->cp.height,
+                static_cast<uint8_t>(Server::frameRate),
+                static_cast<uint8_t>(Server::groupOfPicture),
+                static_cast<uint8_t>(Server::videoQualityCRFCQP)});
     }
 
     video_mode_available = ffmpeg_available && Server::videoCodec[0];
@@ -441,35 +439,12 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     writeCopyRects(copied, copyDelta);
     writeCopyPassRects(copypassed);
 
-    if (video_mode_available && conn->cp.encoder != KasmVideoEncoders::Encoder::unavailable) {
-        auto *screen_encoder_manager = dynamic_cast<ScreenEncoderManager<> *>(encoders[encoderKasmVideo]);
-        if (screen_encoder_manager) {
-            if (screen_encoder_manager->get_encoder() != conn->cp.encoder) {
-                delete encoders[encoderKasmVideo];
+    bool video_mode = video_mode_available && conn->cp.encoder != KasmVideoEncoders::Encoder::unavailable;
+    if (video_mode) {
+        video_mode = updateVideo(changed, layout, pb);
+    }
 
-                const VideoEncoderParams encoder_params = {0,
-                    0,
-                    static_cast<uint8_t>(Server::frameRate),
-                    static_cast<uint8_t>(Server::groupOfPicture),
-                    static_cast<uint8_t>(Server::videoQualityCRFCQP)};
-
-                encoders[encoderKasmVideo] = new ScreenEncoderManager(ffmpeg,
-                    conn->cp.encoder,
-                    encoder_probe.get_available_encoders(),
-                    conn,
-                    encoder_probe.get_drm_device_path(),
-                    encoder_params);
-            }
-            if (screen_encoder_manager->sync_layout(layout, changed)) {
-                static const Palette palette;
-                screen_encoder_manager->writeRect(pb, palette);
-            }
-        }
-
-        std::vector<Rect> rects;
-        changed.get_rects(&rects);
-        updateVideoStats(rects, pb);
-    } else {
+    if (!video_mode) {
         /*
          * We start by searching for solid rects, which are then removed
          * from the changed region.
@@ -503,6 +478,44 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
 
     printf("TOTAL FRAME TOOK: %d\n", msSince(&start));
     conn->writer()->writeFramebufferUpdateEnd();
+}
+
+bool EncodeManager::updateVideo(const Region &changed, const ScreenSet &layout, const PixelBuffer *pb) {
+    auto *screen_encoder_manager = dynamic_cast<ScreenEncoderManager<> *>(encoders[encoderKasmVideo]);
+    if (!screen_encoder_manager)
+        return false;
+
+    if (screen_encoder_manager->get_encoder() != conn->cp.encoder) {
+        delete encoders[encoderKasmVideo];
+
+        screen_encoder_manager = new ScreenEncoderManager(ffmpeg,
+            conn->cp.encoder,
+            encoder_probe.get_available_encoders(),
+            conn,
+            encoder_probe.get_drm_device_path(),
+            {0,
+                0,
+                static_cast<uint8_t>(Server::frameRate),
+                static_cast<uint8_t>(Server::groupOfPicture),
+                static_cast<uint8_t>(Server::videoQualityCRFCQP)});
+
+        if (!screen_encoder_manager)
+            return false;
+
+        encoders[encoderKasmVideo] = screen_encoder_manager;
+    }
+
+    if (!screen_encoder_manager->sync_layout(layout, changed))
+        return false;
+
+    static const Palette palette;
+    screen_encoder_manager->writeRect(pb, palette);
+
+    std::vector<Rect> rects;
+    changed.get_rects(&rects);
+    updateVideoStats(rects, pb);
+
+    return true;
 }
 
 void EncodeManager::prepareEncoders(bool allowLossy)
