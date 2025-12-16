@@ -520,18 +520,17 @@ bool EncodeManager::updateVideo(const Region &changed, const ScreenSet &layout, 
 
 void EncodeManager::prepareEncoders(bool allowLossy)
 {
-  enum EncoderClass solid, bitmap, bitmapRLE;
-  enum EncoderClass indexed, indexedRLE, fullColour;
+  EncoderClass bitmap, bitmapRLE;
+  EncoderClass indexedRLE, fullColour;
 
-  rdr::S32 preferred;
-
-  std::vector<int>::iterator iter;
-
-  solid = bitmap = bitmapRLE = encoderRaw;
-  indexed = indexedRLE = fullColour = encoderRaw;
+  auto solid = bitmap = bitmapRLE = encoderRaw;
+  auto indexed = indexedRLE = fullColour = encoderRaw;
 
   // Try to respect the client's wishes
-  preferred = conn->getPreferredEncoding();
+  const auto preferred = conn->getPreferredEncoding();
+  const bool isHighBppSupported = conn->cp.pf().bpp >= 16;
+  const bool isHighBppLossyAllowed = isHighBppSupported && allowLossy;
+
   switch (preferred) {
   case encodingRRE:
     // Horrible for anything high frequency and/or lots of colours
@@ -542,14 +541,11 @@ void EncodeManager::prepareEncoders(bool allowLossy)
     bitmapRLE = indexedRLE = fullColour = encoderHextile;
     break;
   case encodingTight:
-    if (encoders[encoderTightQOI]->isSupported() &&
-        (conn->cp.pf().bpp >= 16))
+    if (encoders[encoderTightQOI]->isSupported() && isHighBppSupported)
       fullColour = encoderTightQOI;
-    else if (encoders[encoderTightWEBP]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightWEBP]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightWEBP;
-    else if (encoders[encoderTightJPEG]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightJPEG]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightJPEG;
     else
       fullColour = encoderTight;
@@ -566,14 +562,11 @@ void EncodeManager::prepareEncoders(bool allowLossy)
   // Any encoders still unassigned?
 
   if (fullColour == encoderRaw) {
-    if (encoders[encoderTightQOI]->isSupported() &&
-        (conn->cp.pf().bpp >= 16))
+    if (encoders[encoderTightQOI]->isSupported() && isHighBppSupported)
       fullColour = encoderTightQOI;
-    else if (encoders[encoderTightWEBP]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightWEBP]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightWEBP;
-    else if (encoders[encoderTightJPEG]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightJPEG]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightJPEG;
     else if (encoders[encoderZRLE]->isSupported())
       fullColour = encoderZRLE;
@@ -625,10 +618,8 @@ void EncodeManager::prepareEncoders(bool allowLossy)
   activeEncoders[encoderIndexedRLE] = indexedRLE;
   activeEncoders[encoderFullColour] = fullColour;
 
-  for (iter = activeEncoders.begin(); iter != activeEncoders.end(); ++iter) {
-    Encoder *encoder;
-
-    encoder = encoders[*iter];
+  for (const auto activeEncoder : activeEncoders) {
+    auto *encoder = encoders[activeEncoder];
 
     encoder->setCompressLevel(conn->cp.compressLevel);
     encoder->setQualityLevel(conn->cp.qualityLevel);
