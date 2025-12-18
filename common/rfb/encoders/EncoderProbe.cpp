@@ -79,10 +79,10 @@ namespace rfb::video_encoders {
 
                 FFmpeg::BufferGuard hw_ctx_guard;
                 AVBufferRef *hw_ctx{};
-                hw_ctx_guard.reset(hw_ctx);
 
                 if (dri_node) {
                     const auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, dri_node, nullptr, 0);
+                    hw_ctx_guard.reset(hw_ctx);
                     if (err == 0) {
                         drm_device_path = dri_node;
                         result.push_back(encoder_candidate.encoder);
@@ -93,6 +93,7 @@ namespace rfb::video_encoders {
                     vlog.debug("Trying to open all DRM devices");
                     for (const auto *drm_dev_path: drm_device_paths) {
                         const auto err = ffmpeg.av_hwdevice_ctx_create(&hw_ctx, encoder_candidate.hw_type, drm_dev_path, nullptr, 0);
+                        hw_ctx_guard.reset(hw_ctx);
                         if (err < 0) {
                             vlog.error("%s", ffmpeg.get_error_description(err).c_str());
 
