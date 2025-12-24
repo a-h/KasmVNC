@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "KasmVideoConstants.h"
+#include "SupportedVideoEncoders.h"
 #include "rfb/ffmpeg.h"
 
 namespace rfb::video_encoders {
