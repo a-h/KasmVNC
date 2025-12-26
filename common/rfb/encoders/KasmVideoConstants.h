@@ -32,8 +32,6 @@ namespace rfb {
         "/dev/dri/renderD128",
         "/dev/dri/card0",
         "/dev/dri/renderD129",
-        "/dev/dri/card1",
+        "/dev/dri/card1"
     });
-
-
 } // namespace rfb
