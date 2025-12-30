@@ -77,6 +77,7 @@ set(RFB_SOURCES
         encoders/ScreenEncoderManager.cxx
         encoders/VideoEncoderFactory.cxx
         encoders/EncoderProbe.cpp
+        encoders/EncoderConfiguration.cpp
 )
 
 if (UNIX)
