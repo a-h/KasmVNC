@@ -17,19 +17,20 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-#include <stdio.h>
-#include <string.h>
 #include <rdr/InStream.h>
 #include <rdr/OutStream.h>
+#include <rfb/ConnParams.h>
 #include <rfb/Exception.h>
+#include <rfb/LogWriter.h>
+#include <rfb/SMsgHandler.h>
+#include <rfb/ServerCore.h>
+#include <rfb/clipboardTypes.h>
+#include <rfb/encoders/EncoderConfiguration.h>
 #include <rfb/encodings.h>
 #include <rfb/ledStates.h>
-#include <rfb/LogWriter.h>
-#include <rfb/clipboardTypes.h>
-#include <rfb/ConnParams.h>
-#include <rfb/ServerCore.h>
-#include <rfb/SMsgHandler.h>
 #include <rfb/util.h>
+#include <stdio.h>
+#include <string.h>
 
 using namespace rfb;
 
