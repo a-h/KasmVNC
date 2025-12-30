@@ -24,6 +24,7 @@
 #include <rfb/LogWriter.h>
 #include <rfb/SMsgWriter.h>
 #include <rfb/UpdateTracker.h>
+#include <rfb/encoders/EncoderConfiguration.h>
 #include <rfb/fenceTypes.h>
 #include <rfb/ledStates.h>
 #include <rfb/msgTypes.h>
@@ -782,8 +783,19 @@ void SMsgWriter::writeVideoEncoders(const std::vector<int32_t> &encoders) {
     const uint8_t size = conjunction.size();
     os->writeU8(size);
 
-    for (auto encoder: conjunction)
+    for (auto encoder: conjunction) {
         os->writeS32(encoder);
+
+        const auto &config = EncoderConfiguration::get_configuration(KasmVideoEncoders::from_encoding(encoder));
+
+        os->writeS32(config.min_quality);
+        os->writeS32(config.max_quality);
+
+        os->writeU8(config.presets.size());
+        for (const auto &preset_value: config.presets) {
+            os->writeS32(preset_value);
+        }
+    }
 
     endMsg();
 }

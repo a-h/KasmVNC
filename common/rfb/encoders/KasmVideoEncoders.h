@@ -75,11 +75,6 @@ auto enum_range(T begin, T end) {
 
 namespace rfb {
     struct KasmVideoEncoders {
-        struct EncoderSettings {
-            int16_t min_quality{};
-            int16_t max_quality{};
-            std::array<uint16_t, 5> presets{};
-        };
         // Codecs are ordered by preferred usage quality
         enum class Encoder : uint8_t
         {
@@ -98,7 +93,7 @@ namespace rfb {
             h264_nvenc,
             h264_software,
 
-            unavailable
+            unavailable // Keep this as the last entry - used for compile-time size checks
         };
 
         using Encoders = std::vector<Encoder>;
@@ -119,6 +114,8 @@ namespace rfb {
             "libx264",
             "unavailable"});
 
+        static_assert(EncoderNames.size() == static_cast<size_t>(Encoder::unavailable) + 1, "EncoderNames array size must match Encoder enum count.");
+
         static inline auto Encodings = std::to_array<int>({pseudoEncodingStreamingModeAV1VAAPI,
             pseudoEncodingStreamingModeAV1VAAPI,
             pseudoEncodingStreamingModeAV1NVENC,
@@ -135,6 +132,8 @@ namespace rfb {
             pseudoEncodingStreamingModeAVCSW,
 
             pseudoEncodingStreamingModeJpegWebp});
+
+        static_assert(Encodings.size() == static_cast<size_t>(Encoder::unavailable) + 1, "Encodings array size must match Encoder enum count. ");
 
         static bool is_accelerated(Encoder encoder) {
             return encoder != Encoder::h264_software && encoder != Encoder::h265_software && encoder != Encoder::av1_software;

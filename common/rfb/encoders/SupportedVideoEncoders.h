@@ -1,5 +1,5 @@
 /* Copyright (C) 2025 Kasm.  All Rights Reserved.
-*
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -17,8 +17,8 @@
  */
 #pragma once
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <string_view>
 #include <vector>
@@ -46,7 +46,7 @@ namespace rfb {
             av1_vaapi,
             av1_nvenc,
             auto_detect,
-            unavailable
+            unavailable // Keep this as the last entry - used for compile-time size checks
         };
 
         static constexpr auto MappedCodecs = std::to_array<KasmVideoEncoders::Encoder>({KasmVideoEncoders::Encoder::h264_software,
@@ -70,6 +70,9 @@ namespace rfb {
 
             KasmVideoEncoders::Encoder::unavailable});
 
+        static_assert(
+            MappedCodecs.size() == static_cast<size_t>(Codecs::unavailable) + 1, "MappedCodecs array size must match Codecs enum count");
+
         static inline auto CodecNames = std::to_array<std::string_view>({"h264",
             "h264_vaapi",
             "h264_nvenc",
@@ -89,6 +92,8 @@ namespace rfb {
             "av1_nvenc",
 
             "auto"});
+
+        static_assert(CodecNames.size() == static_cast<size_t>(Codecs::unavailable), "CodecNames array size must match Codecs enum count");
 
         static std::string_view to_string(Codecs codec) {
             return CodecNames[static_cast<uint8_t>(codec)];
