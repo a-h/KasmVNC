@@ -27,11 +27,11 @@ namespace rfb {
             // h264_vaapi
             EncoderConfiguration{0, 51, {18, 23, 28, 33, 51}},
             // h264_ffmpeg_vaapi
-            EncoderConfiguration{0, 51, {18, 23, 28, 39, 51}},
+            EncoderConfiguration{0, 51, {12, 16, 25, 39, 51}},
             // h264_nvenc
             EncoderConfiguration{0, 51, {18, 23, 28, 39, 51}},
             // h264_software
-            EncoderConfiguration{0, 51, {18, 23, 28, 39, 51}},
+            EncoderConfiguration{0, 51, {9, 18, 25, 39, 51}},
 
             EncoderConfiguration{}
     };
