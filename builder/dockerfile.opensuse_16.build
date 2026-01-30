@@ -48,7 +48,8 @@ RUN zypper install -ny \
   xorg-x11-util-devel \
   xorg-x11-server-sdk \
   xorg-x11-util-devel \
-  zlib-devel
+  zlib-devel \
+  libva-devel
 
 RUN useradd -u 1000 docker && \
   usermod -a -G docker docker
