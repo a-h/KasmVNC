@@ -79,7 +79,7 @@ XserverDesktop::XserverDesktop(int screenIndex_,
                                std::list<network::SocketListener*> listeners_,
                                const char* name, const rfb::PixelFormat &pf,
                                int width, int height,
-                               void* fbptr, int stride)
+                               void* fbptr, int stride, const video_encoders::EncoderProbe &probe)
   : screenIndex(screenIndex_),
     server(0), listeners(listeners_),
     directFbptr(true),
@@ -87,7 +87,7 @@ XserverDesktop::XserverDesktop(int screenIndex_,
 {
   format = pf;
 
-  server = new VNCServerST(name, this);
+  server = new VNCServerST(name, this, probe);
   setFramebuffer(width, height, fbptr, stride);
   server->setQueryConnectionHandler(this);
 

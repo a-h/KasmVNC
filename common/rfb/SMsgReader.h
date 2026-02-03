@@ -32,7 +32,7 @@ namespace rfb {
   class SMsgReader {
   public:
     SMsgReader(SMsgHandler* handler, rdr::InStream* is);
-    virtual ~SMsgReader();
+    virtual ~SMsgReader() = default;
 
     void readClientInit();
 
@@ -68,6 +68,7 @@ namespace rfb {
 
     void readSubscribeUnixRelay();
     void readUnixRelay();
+      void readVideoEncodersRequest() const;
 
     SMsgHandler* handler;
     rdr::InStream* is;

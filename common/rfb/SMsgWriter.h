@@ -25,7 +25,6 @@
 
 #include <string>
 #include <rdr/types.h>
-#include <rfb/encodings.h>
 #include <rfb/ScreenSet.h>
 #include <rfb/SConnection.h>
 #include <vector>
@@ -40,7 +39,7 @@ namespace rfb {
   class SMsgWriter {
   public:
     SMsgWriter(ConnParams* cp, rdr::OutStream* os, rdr::OutStream *udps);
-    virtual ~SMsgWriter();
+    virtual ~SMsgWriter() = default;
 
     // writeServerInit() must only be called at the appropriate time in the
     // protocol initialisation.
@@ -132,6 +131,7 @@ namespace rfb {
 
     void writeSubscribeUnixRelay(const bool success, const char *msg);
     void writeUnixRelay(const char *name, const rdr::U8 *buf, const unsigned len);
+    void writeVideoEncoders(const std::vector<int32_t> &encoders);
 
     void writeUserJoinedSession(const std::string& username);
     void writeUserLeftSession(const std::string& username);

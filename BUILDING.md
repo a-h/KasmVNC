@@ -6,7 +6,7 @@
 git submodule init
 git submodule update --remote --merge
 sudo docker build -t kasmvnc:dev -f builder/dockerfile.ubuntu_jammy.dev .
-sudo docker run -it --rm -v ./:/src -p 6901:6901 -p 8443:8443 --name kasmvnc_dev kasmvnc:dev
+sudo docker run -it --rm -v ./:/src -p 2222:22 -p 6901:6901 -p 8443:8443 --device=/dev/dri/card0 --device=/dev/dri/renderD128 --group-add video --group-add render --name kasmvnc_dev kasmvnc:dev
 ```
 
 **The above assumes you are UID 1000 on the host as the container UID is 1000.**
@@ -30,7 +30,10 @@ builder/build.sh
 Now run Xvnc and Xfce4 from inside the container
 
 ```bash
-/src/xorg.build/bin/Xvnc -interface 0.0.0.0 -PublicIP 127.0.0.1 -disableBasicAuth -RectThreads 0 -Log *:stdout:100 -httpd /src/kasmweb/dist -sslOnly 0 -SecurityTypes None -websocketPort 6901 -FreeKeyMappings :1 &
+mkdir ~/.vnc
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout ${HOME}/.vnc/self.pem -out ${HOME}/.vnc/self.pem -subj "/C=US/ST=VA/L=None/O=None/OU=DoFu/CN=kasm/emailAddress=none@none.none"
+
+/src/xorg.build/bin/Xvnc -interface 0.0.0.0 -PublicIP 127.0.0.1 -disableBasicAuth -RectThreads 0 -Log *:stdout:100 -httpd /src/kasmweb/dist -sslOnly 1 -SecurityTypes None -websocketPort 6901 -FreeKeyMappings -cert ~/.vnc/self.pem -key ~/.vnc/self.pem -videoCodec h264 :1 &
 /usr/bin/xfce4-session --display :1
 ```
 

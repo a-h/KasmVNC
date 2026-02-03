@@ -21,79 +21,109 @@
 
 namespace rfb {
 
-  const int encodingRaw = 0;
-  const int encodingCopyRect = 1;
-  const int encodingRRE = 2;
-  const int encodingCoRRE = 4;
-  const int encodingHextile = 5;
-  const int encodingTight = 7;
-  const int encodingUdp = 8;
-  const int encodingZRLE = 16;
+  constexpr int encodingRaw = 0;
+  constexpr int encodingCopyRect = 1;
+  constexpr int encodingRRE = 2;
+  constexpr int encodingCoRRE = 4;
+  constexpr int encodingHextile = 5;
+  constexpr int encodingTight = 7;
+  constexpr int encodingUdp = 8;
+  constexpr int encodingZRLE = 16;
+  constexpr int encodingKasmVideo = 17;
 
-  const int encodingMax = 255;
+  constexpr int encodingMax = 255;
 
-  const int pseudoEncodingXCursor = -240;
-  const int pseudoEncodingCursor = -239;
-  const int pseudoEncodingDesktopSize = -223;
-  const int pseudoEncodingLEDState = -261;
-  const int pseudoEncodingExtendedDesktopSize = -308;
-  const int pseudoEncodingDesktopName = -307;
-  const int pseudoEncodingFence = -312;
-  const int pseudoEncodingContinuousUpdates = -313;
-  const int pseudoEncodingCursorWithAlpha = -314;
-  const int pseudoEncodingQEMUKeyEvent = -258;
+  constexpr int pseudoEncodingXCursor = -240;
+  constexpr int pseudoEncodingCursor = -239;
+  constexpr int pseudoEncodingDesktopSize = -223;
+  constexpr int pseudoEncodingLEDState = -261;
+  constexpr int pseudoEncodingExtendedDesktopSize = -308;
+  constexpr int pseudoEncodingDesktopName = -307;
+  constexpr int pseudoEncodingFence = -312;
+  constexpr int pseudoEncodingContinuousUpdates = -313;
+  constexpr int pseudoEncodingCursorWithAlpha = -314;
+  constexpr int pseudoEncodingQEMUKeyEvent = -258;
 
   // TightVNC-specific
-  const int pseudoEncodingLastRect = -224;
-  const int pseudoEncodingQualityLevel0 = -32;
-  const int pseudoEncodingQualityLevel9 = -23;
-  const int pseudoEncodingCompressLevel0 = -256;
-  const int pseudoEncodingCompressLevel9 = -247;
+  constexpr int pseudoEncodingLastRect = -224;
+  constexpr int pseudoEncodingQualityLevel0 = -32;
+  constexpr int pseudoEncodingQualityLevel9 = -23;
+  constexpr int pseudoEncodingCompressLevel0 = -256;
+  constexpr int pseudoEncodingCompressLevel9 = -247;
 
   // TurboVNC-specific
-  const int pseudoEncodingFineQualityLevel0 = -512;
-  const int pseudoEncodingFineQualityLevel100 = -412;
-  const int pseudoEncodingSubsamp1X = -768;
-  const int pseudoEncodingSubsamp4X = -767;
-  const int pseudoEncodingSubsamp2X = -766;
-  const int pseudoEncodingSubsampGray = -765;
-  const int pseudoEncodingSubsamp8X = -764;
-  const int pseudoEncodingSubsamp16X = -763;
+  constexpr int pseudoEncodingFineQualityLevel0 = -512;
+  constexpr int pseudoEncodingFineQualityLevel100 = -412;
+  constexpr int pseudoEncodingSubsamp1X = -768;
+  constexpr int pseudoEncodingSubsamp4X = -767;
+  constexpr int pseudoEncodingSubsamp2X = -766;
+  constexpr int pseudoEncodingSubsampGray = -765;
+  constexpr int pseudoEncodingSubsamp8X = -764;
+  constexpr int pseudoEncodingSubsamp16X = -763;
 
   // Kasm-specific
-  const int pseudoEncodingWEBP = -1024;
-  const int pseudoEncodingJpegVideoQualityLevel0 = -1023;
-  const int pseudoEncodingJpegVideoQualityLevel9 = -1014;
-  const int pseudoEncodingWebpVideoQualityLevel0 = -1013;
-  const int pseudoEncodingWebpVideoQualityLevel9 = -1004;
-  const int pseudoEncodingTreatLosslessLevel0 = -1003;
-  const int pseudoEncodingTreatLosslessLevel10 = -993;
-  const int pseudoEncodingPreferBandwidth = -992;
-  const int pseudoEncodingDynamicQualityMinLevel0 = -991;
-  const int pseudoEncodingDynamicQualityMinLevel9 = -982;
-  const int pseudoEncodingDynamicQualityMaxLevel0 = -981;
-  const int pseudoEncodingDynamicQualityMaxLevel9 = -972;
-  const int pseudoEncodingVideoAreaLevel1 = -971;
-  const int pseudoEncodingVideoAreaLevel100 = -871;
-  const int pseudoEncodingVideoTimeLevel0 = -870;
-  const int pseudoEncodingVideoTimeLevel100 = -770;
+  constexpr int pseudoEncodingWEBP = -1024;
+  constexpr int pseudoEncodingJpegVideoQualityLevel0 = -1023;
+  constexpr int pseudoEncodingJpegVideoQualityLevel9 = -1014;
+  constexpr int pseudoEncodingWebpVideoQualityLevel0 = -1013;
+  constexpr int pseudoEncodingWebpVideoQualityLevel9 = -1004;
+  constexpr int pseudoEncodingTreatLosslessLevel0 = -1003;
+  constexpr int pseudoEncodingTreatLosslessLevel10 = -993;
+  constexpr int pseudoEncodingPreferBandwidth = -992;
+  constexpr int pseudoEncodingDynamicQualityMinLevel0 = -991;
+  constexpr int pseudoEncodingDynamicQualityMinLevel9 = -982;
+  constexpr int pseudoEncodingDynamicQualityMaxLevel0 = -981;
+  constexpr int pseudoEncodingDynamicQualityMaxLevel9 = -972;
+  constexpr int pseudoEncodingVideoAreaLevel1 = -971;
+  constexpr int pseudoEncodingVideoAreaLevel100 = -871;
+  constexpr int pseudoEncodingVideoTimeLevel0 = -870;
+  constexpr int pseudoEncodingVideoTimeLevel100 = -770;
 
-  const int pseudoEncodingFrameRateLevel10 = -2048;
-  const int pseudoEncodingFrameRateLevel60 = -1998;
-  const int pseudoEncodingMaxVideoResolution = -1997;
-  const int pseudoEncodingVideoScalingLevel0 = -1996;
-  const int pseudoEncodingVideoScalingLevel9 = -1987;
-  const int pseudoEncodingVideoOutTimeLevel1 = -1986;
-  const int pseudoEncodingVideoOutTimeLevel100 = -1887;
-  const int pseudoEncodingQOI = -1886;
-  const int pseudoEncodingKasmDisconnectNotify = -1885;
+  constexpr int pseudoEncodingFrameRateLevel10 = -2048;
+  constexpr int pseudoEncodingFrameRateLevel60 = -1998;
+  constexpr int pseudoEncodingMaxVideoResolution = -1997;
+  constexpr int pseudoEncodingVideoScalingLevel0 = -1996;
+  constexpr int pseudoEncodingVideoScalingLevel9 = -1987;
+  constexpr int pseudoEncodingVideoOutTimeLevel1 = -1986;
+  constexpr int pseudoEncodingVideoOutTimeLevel100 = -1887;
+  constexpr int pseudoEncodingQOI = -1886;
+  constexpr int pseudoEncodingKasmDisconnectNotify = -1885;
+
+    constexpr int pseudoEncodingHardwareProfile0 = -1170;
+    constexpr int pseudoEncodingHardwareProfile4 = -1166;
+
+    constexpr int pseudoEncodingGOP1 = -1165;
+    constexpr int pseudoEncodingGOP60 = -1105;
+    constexpr int pseudoEncodingStreamingVideoQualityLevel0 = -1104;
+    constexpr int pseudoEncodingStreamingVideoQualityLevel63 = -1041;
+
+     // AV1
+    constexpr int pseudoEncodingStreamingModeAV1QSV = -1040;
+    constexpr int pseudoEncodingStreamingModeAV1NVENC = -1039;
+    constexpr int pseudoEncodingStreamingModeAV1VAAPI = -1038;
+    constexpr int pseudoEncodingStreamingModeAV1SW = -1037;
+    constexpr int pseudoEncodingStreamingModeAV1 = -1036;
+     // h.265
+    constexpr int pseudoEncodingStreamingModeHEVCQSV = -1035;
+    constexpr int pseudoEncodingStreamingModeHEVCNVENC = -1034;
+    constexpr int pseudoEncodingStreamingModeHEVCVAAPI = -1033;
+    constexpr int pseudoEncodingStreamingModeHEVCSW = -1032;
+    constexpr int pseudoEncodingStreamingModeHEVC = -1031;
+     // h.264
+    constexpr int pseudoEncodingStreamingModeAVCQSV = -1030;
+    constexpr int pseudoEncodingStreamingModeAVCNVENC = -1029;
+    constexpr int pseudoEncodingStreamingModeAVCVAAPI = -1028;
+    constexpr int pseudoEncodingStreamingModeAVCSW = -1027;
+    constexpr int pseudoEncodingStreamingModeAVC = -1026;
+
+    constexpr int pseudoEncodingStreamingModeJpegWebp = -1025;
 
   // VMware-specific
-  const int pseudoEncodingVMwareCursor = 0x574d5664;
-  const int pseudoEncodingVMwareCursorPosition = 0x574d5666;
+  constexpr int pseudoEncodingVMwareCursor = 0x574d5664;
+  constexpr int pseudoEncodingVMwareCursorPosition = 0x574d5666;
 
   // UltraVNC-specific
-  const int pseudoEncodingExtendedClipboard = 0xC0A1E5CE;
+  constexpr int pseudoEncodingExtendedClipboard = 0xC0A1E5CE;
 
   int encodingNum(const char* name);
   const char* encodingName(int num);

@@ -68,11 +68,15 @@ namespace rfb {
         static IntParameter videoOutTime;
         static IntParameter videoArea;
         static IntParameter videoScaling;
+        static IntParameter videoQualityCRFCQP;
+        static IntParameter groupOfPicture;
+        static StringParameter driNode;
         static IntParameter udpFullFrameFrequency;
         static IntParameter udpPort;
         static StringParameter kasmPasswordFile;
         static StringParameter publicIP;
         static StringParameter stunServer;
+        static StringParameter videoCodec;
         static BoolParameter printVideoArea;
         static BoolParameter protocol3_3;
         static BoolParameter alwaysShared;

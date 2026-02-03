@@ -41,7 +41,7 @@ ZRLEEncoder::~ZRLEEncoder()
   zos.setUnderlying(NULL);
 }
 
-bool ZRLEEncoder::isSupported()
+bool ZRLEEncoder::isSupported() const
 {
   return conn->cp.supportsEncoding(encodingZRLE);
 }

@@ -76,11 +76,7 @@ TightJPEGEncoder::TightJPEGEncoder(SConnection* conn) :
 {
 }
 
-TightJPEGEncoder::~TightJPEGEncoder()
-{
-}
-
-bool TightJPEGEncoder::isSupported()
+bool TightJPEGEncoder::isSupported() const
 {
   if (!conn->cp.supportsEncoding(encodingTight))
     return false;

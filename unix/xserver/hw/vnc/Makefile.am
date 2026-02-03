@@ -21,9 +21,9 @@ libvnccommon_la_SOURCES = $(HDRS) \
 	vncBlockHandler.c XorgGlue.c RandrGlue.c RFBGlue.cc XserverDesktop.cc \
 	Input.c InputXKB.c qnum_to_xorgevdev.c qnum_to_xorgkbd.c
 
-libvnccommon_la_CPPFLAGS = -DVENDOR_RELEASE="$(VENDOR_RELEASE)" -I$(KASMVNC_SRCDIR)/unix/common \
+libvnccommon_la_CPPFLAGS = -std=c++20 -DVENDOR_RELEASE="$(VENDOR_RELEASE)" -I$(KASMVNC_SRCDIR)/unix/common \
 	-DVENDOR_STRING="\"$(VENDOR_STRING)\"" -I$(KASMVNC_SRCDIR)/common -UHAVE_CONFIG_H \
-	-I$(KASMVNC_SRCDIR)/unix/vncconfig $(XVNC_CPPFLAGS) ${XSERVERLIBS_CFLAGS} -I$(includedir) \
+	-I$(KASMVNC_SRCDIR)/unix/vncconfig $(XVNC_CPPFLAGS) ${XSERVERLIBS_CFLAGS} $(shell pkg-config --cflags libavcodec libavformat libavutil libswscale 2>/dev/null || echo "") -I$(includedir) \
 	-I$(top_srcdir)/include
 
 bin_PROGRAMS = Xvnc

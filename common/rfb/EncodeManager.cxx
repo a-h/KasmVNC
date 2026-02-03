@@ -34,16 +34,20 @@
 #include <rfb/Exception.h>
 #include <rfb/Watermark.h>
 
-#include <rfb/RawEncoder.h>
-#include <rfb/RREEncoder.h>
+#include <execution>
 #include <rfb/HextileEncoder.h>
-#include <rfb/ZRLEEncoder.h>
+#include <rfb/RREEncoder.h>
+#include <rfb/RawEncoder.h>
 #include <rfb/TightEncoder.h>
 #include <rfb/TightJPEGEncoder.h>
-#include <rfb/TightWEBPEncoder.h>
 #include <rfb/TightQOIEncoder.h>
-#include <execution>
+#include <rfb/TightWEBPEncoder.h>
+#include <rfb/ZRLEEncoder.h>
 #include <tbb/parallel_for.h>
+
+#include "encoders/EncoderProbe.h"
+#include "encoders/ScreenEncoderManager.h"
+#include "encoders/VideoEncoder.h"
 
 using namespace rfb;
 
@@ -54,14 +58,14 @@ static LogWriter vlog("EncodeManager");
 
 // Split each rectangle into smaller ones no larger than this area,
 // and no wider than this width.
-static const int SubRectMaxArea = 65536;
-static const int SubRectMaxWidth = 2048;
+static constexpr int SubRectMaxArea = 65536;
+static constexpr int SubRectMaxWidth = 2048;
 
 // The size in pixels of either side of each block tested when looking
 // for solid blocks.
-static const int SolidSearchBlock = 16;
+static constexpr int SolidSearchBlock = 16;
 // Don't bother with blocks smaller than this
-static const int SolidBlockMinArea = 2048;
+static constexpr int SolidBlockMinArea = 2048;
 
 namespace rfb {
 
@@ -74,6 +78,7 @@ enum EncoderClass {
   encoderTightWEBP,
   encoderTightQOI,
   encoderZRLE,
+  encoderKasmVideo,
   encoderClassMax,
 };
 
@@ -119,6 +124,8 @@ static const char *encoderClassName(EncoderClass klass)
     return "Tight (QOI)";
   case encoderZRLE:
     return "ZRLE";
+  case encoderKasmVideo:
+    return "KasmVideo";
   case encoderClassMax:
     break;
   }
@@ -160,56 +167,69 @@ static void updateMaxVideoRes(uint16_t *x, uint16_t *y) {
   }
 }
 
-EncodeManager::EncodeManager(SConnection* conn_, EncCache *encCache_) : conn(conn_),
-  dynamicQualityMin(-1), dynamicQualityOff(-1),
-  areaCur(0), videoDetected(false), videoTimer(this),
-  watermarkStats(0),
-  maxEncodingTime(0), framesSinceEncPrint(0),
-  encCache(encCache_)
+EncodeManager::EncodeManager(SConnection *conn_, EncCache *encCache_, const FFmpeg& ffmpeg_, const video_encoders::EncoderProbe &encoder_probe_) :
+    conn(conn_), dynamicQualityMin(-1), dynamicQualityOff(-1), areaCur(0), videoDetected(false), videoTimer(this),
+    watermarkStats(0), maxEncodingTime(0), framesSinceEncPrint(0), ffmpeg(ffmpeg_), ffmpeg_available(ffmpeg.is_available()),
+    encoder_probe(encoder_probe_), encCache(encCache_)
 {
-  StatsVector::iterator iter;
+    encoders.resize(encoderClassMax, nullptr);
+    activeEncoders.resize(encoderTypeMax, encoderRaw);
 
-  encoders.resize(encoderClassMax, NULL);
-  activeEncoders.resize(encoderTypeMax, encoderRaw);
+    encoders[encoderRaw] = new RawEncoder(conn);
+    encoders[encoderRRE] = new RREEncoder(conn);
+    encoders[encoderHextile] = new HextileEncoder(conn);
+    encoders[encoderTight] = new TightEncoder(conn);
+    encoders[encoderTightJPEG] = new TightJPEGEncoder(conn);
+    encoders[encoderTightWEBP] = new TightWEBPEncoder(conn);
+    encoders[encoderTightQOI] = new TightQOIEncoder(conn);
+    encoders[encoderZRLE] = new ZRLEEncoder(conn);
 
-  encoders[encoderRaw] = new RawEncoder(conn);
-  encoders[encoderRRE] = new RREEncoder(conn);
-  encoders[encoderHextile] = new HextileEncoder(conn);
-  encoders[encoderTight] = new TightEncoder(conn);
-  encoders[encoderTightJPEG] = new TightJPEGEncoder(conn);
-  encoders[encoderTightWEBP] = new TightWEBPEncoder(conn);
-  encoders[encoderTightQOI] = new TightQOIEncoder(conn);
-  encoders[encoderZRLE] = new ZRLEEncoder(conn);
+    if (ffmpeg_available) {
+        encoders[encoderKasmVideo] = new ScreenEncoderManager(ffmpeg,
+            encoder_probe.get_best_encoder(),
+            encoder_probe.get_available_encoders(),
+            conn,
+            encoder_probe.get_drm_device_path(),
+            {conn_->cp.width,
+                conn_->cp.height,
+                static_cast<uint8_t>(Server::frameRate),
+                static_cast<uint8_t>(Server::groupOfPicture),
+                static_cast<uint8_t>(Server::videoQualityCRFCQP)});
+    }
 
-  webpBenchResult = ((TightWEBPEncoder *) encoders[encoderTightWEBP])->benchmark();
-  vlog.info("WEBP benchmark result: %u ms", webpBenchResult);
+    video_mode_available = ffmpeg_available && Server::videoCodec[0];
 
-  unsigned videoTime = rfb::Server::videoTime;
-  if (videoTime < 1) videoTime = 1;
-  //areaPercentages = new unsigned char[videoTime * rfb::Server::frameRate]();
-  // maximum possible values, as they may change later at runtime
-  areaPercentages = new unsigned char[2000 * 60]();
+    webpBenchResult = ((TightWEBPEncoder *) encoders[encoderTightWEBP])->benchmark();
+    vlog.info("WEBP benchmark result: %u ms", webpBenchResult);
 
-  if (!rfb::Server::videoTime)
-    videoDetected = true;
+    unsigned videoTime = rfb::Server::videoTime;
+    if (videoTime < 1)
+        videoTime = 1;
+    // areaPercentages = new unsigned char[videoTime * rfb::Server::frameRate]();
+    //  maximum possible values, as they may change later at runtime
+    areaPercentages = new unsigned char[2000 * 60]();
 
-  updateMaxVideoRes(&maxVideoX, &maxVideoY);
+    if (!rfb::Server::videoTime)
+        videoDetected = true;
 
-  updates = 0;
-  memset(&copyStats, 0, sizeof(copyStats));
-  stats.resize(encoderClassMax);
-  for (iter = stats.begin();iter != stats.end();++iter) {
-    StatsVector::value_type::iterator iter2;
-    iter->resize(encoderTypeMax);
-    for (iter2 = iter->begin();iter2 != iter->end();++iter2)
-      memset(&*iter2, 0, sizeof(EncoderStats));
-  }
+    updateMaxVideoRes(&maxVideoX, &maxVideoY);
 
-  if (Server::dynamicQualityMax && Server::dynamicQualityMax <= 9 &&
-      Server::dynamicQualityMax > Server::dynamicQualityMin) {
-    dynamicQualityMin = Server::dynamicQualityMin;
-    dynamicQualityOff = Server::dynamicQualityMax - Server::dynamicQualityMin;
-  }
+    updates = 0;
+    memset(&copyStats, 0, sizeof(copyStats));
+    stats.resize(encoderClassMax);
+    for (auto iter = stats.begin(); iter != stats.end(); ++iter)
+    {
+        StatsVector::value_type::iterator iter2;
+        iter->resize(encoderTypeMax);
+        for (iter2 = iter->begin(); iter2 != iter->end(); ++iter2)
+            memset(&*iter2, 0, sizeof(EncoderStats));
+    }
+
+    if (Server::dynamicQualityMax && Server::dynamicQualityMax <= 9 &&
+        Server::dynamicQualityMax > Server::dynamicQualityMin) {
+        dynamicQualityMin = Server::dynamicQualityMin;
+        dynamicQualityOff = Server::dynamicQualityMax - Server::dynamicQualityMin;
+    }
 
     const auto num_cores = cpu_info::cores_count;
     arena.initialize(num_cores);
@@ -217,17 +237,15 @@ EncodeManager::EncodeManager(SConnection* conn_, EncCache *encCache_) : conn(con
 
 EncodeManager::~EncodeManager()
 {
-  std::vector<Encoder*>::iterator iter;
+    logStats();
 
-  logStats();
+    delete[] areaPercentages;
 
-  delete [] areaPercentages;
+    for (auto iter = encoders.begin(); iter != encoders.end(); ++iter)
+        delete *iter;
 
-  for (iter = encoders.begin();iter != encoders.end();iter++)
-    delete *iter;
-
-  for (std::list<QualityInfo*>::iterator it = qualityList.begin(); it != qualityList.end(); it++)
-    delete *it;
+    for (auto it = qualityList.begin(); it != qualityList.end(); ++it)
+        delete *it;
 }
 
 void EncodeManager::logStats()
@@ -335,38 +353,38 @@ void EncodeManager::pruneLosslessRefresh(const Region& limits)
   lossyRegion.assign_intersect(limits);
 }
 
-void EncodeManager::writeUpdate(const UpdateInfo& ui, const PixelBuffer* pb,
+void EncodeManager::writeUpdate(const UpdateInfo& ui, const ScreenSet &layout, const PixelBuffer* pb,
                                 const RenderedCursor* renderedCursor,
                                 size_t maxUpdateSize)
 {
     curMaxUpdateSize = maxUpdateSize;
-    doUpdate(true, ui.changed, ui.copied, ui.copy_delta, ui.copypassed, pb, renderedCursor);
+    doUpdate(true, ui.changed, ui.copied, ui.copy_delta, ui.copypassed, layout, pb, renderedCursor);
 }
 
-void EncodeManager::writeLosslessRefresh(const Region& req, const PixelBuffer* pb,
+void EncodeManager::writeLosslessRefresh(const Region& req,  const ScreenSet &layout, const PixelBuffer* pb,
                                          const RenderedCursor* renderedCursor,
                                          size_t maxUpdateSize)
 {
-    if (videoDetected)
+    if (videoDetected || video_mode_available)
         return;
 
     doUpdate(false, getLosslessRefresh(req, maxUpdateSize),
-             Region(), Point(), std::vector<CopyPassRect>(), pb, renderedCursor);
+             Region(), Point(), std::vector<CopyPassRect>(), layout, pb, renderedCursor);
 }
 
 void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
                              const Region& copied, const Point& copyDelta,
                              const std::vector<CopyPassRect>& copypassed,
+                             const ScreenSet &layout,
                              const PixelBuffer* pb,
-                             const RenderedCursor* renderedCursor)
-{
+                             const RenderedCursor* renderedCursor) {
     int nRects;
     Region changed, cursorRegion;
     struct timeval start;
 
     updates++;
     if (conn->cp.supportsUdp)
-      ((network::UdpStream *) conn->getOutStream(conn->cp.supportsUdp))->setFrameNumber(updates);
+        ((network::UdpStream *) conn->getOutStream(conn->cp.supportsUdp))->setFrameNumber(updates);
 
 
     // The video resolution may have changed, check it
@@ -376,12 +394,12 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     // The dynamic quality params may have changed
     if (Server::dynamicQualityMax && Server::dynamicQualityMax <= 9 &&
         Server::dynamicQualityMax > Server::dynamicQualityMin) {
-      dynamicQualityMin = Server::dynamicQualityMin;
-      dynamicQualityOff = Server::dynamicQualityMax - Server::dynamicQualityMin;
-    } else if (Server::dynamicQualityMin >= 0) {
-      dynamicQualityMin = Server::dynamicQualityMin;
-      dynamicQualityOff = 0;
-    }
+        dynamicQualityMin = Server::dynamicQualityMin;
+        dynamicQualityOff = Server::dynamicQualityMax - Server::dynamicQualityMin;
+        } else if (Server::dynamicQualityMin >= 0) {
+            dynamicQualityMin = Server::dynamicQualityMin;
+            dynamicQualityOff = 0;
+        }
 
     prepareEncoders(allowLossy);
 
@@ -400,20 +418,20 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
      * magical pixel buffer, so split it out from the changed region.
      */
     if (renderedCursor != NULL) {
-      cursorRegion = changed.intersect(renderedCursor->getEffectiveRect());
-      changed.assign_subtract(renderedCursor->getEffectiveRect());
+        cursorRegion = changed.intersect(renderedCursor->getEffectiveRect());
+        changed.assign_subtract(renderedCursor->getEffectiveRect());
     }
 
     if (conn->cp.supportsLastRect)
-      nRects = 0xFFFF;
+        nRects = 0xFFFF;
     else {
-      nRects = copied.numRects();
-      nRects += copypassed.size();
-      nRects += computeNumRects(changed);
-      nRects += computeNumRects(cursorRegion);
+        nRects = copied.numRects();
+        nRects += copypassed.size();
+        nRects += computeNumRects(changed);
+        nRects += computeNumRects(cursorRegion);
 
-      if (watermarkData)
-          nRects++;
+        if (watermarkData)
+            nRects++;
     }
 
     conn->writer()->writeFramebufferUpdateStart(nRects);
@@ -421,17 +439,23 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     writeCopyRects(copied, copyDelta);
     writeCopyPassRects(copypassed);
 
-    /*
-     * We start by searching for solid rects, which are then removed
-     * from the changed region.
-     */
-    if (conn->cp.supportsLastRect && !conn->cp.supportsQOI)
-      writeSolidRects(&changed, pb);
+    bool video_mode = video_mode_available && conn->cp.encoder != KasmVideoEncoders::Encoder::unavailable;
+    if (video_mode) {
+        video_mode = updateVideo(changed, layout, pb);
+    }
 
-    writeRects(changed, pb,
-               &start, true);
-    if (!videoDetected) // In case detection happened between the calls
-      writeRects(cursorRegion, renderedCursor);
+    if (!video_mode) {
+        /*
+         * We start by searching for solid rects, which are then removed
+         * from the changed region.
+         */
+        if (conn->cp.supportsLastRect && !conn->cp.supportsQOI)
+            writeSolidRects(&changed, pb);
+
+        writeRects(changed, pb, &start, true);
+        if (!videoDetected) // In case detection happened between the calls
+            writeRects(cursorRegion, renderedCursor);
+    }
 
     if (watermarkData && conn->sendWatermark()) {
       beforeLength = conn->getOutStream(conn->cp.supportsUdp)->length();
@@ -452,23 +476,61 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
 
     updateQualities();
 
+    printf("TOTAL FRAME TOOK: %d\n", msSince(&start));
     conn->writer()->writeFramebufferUpdateEnd();
+}
+
+bool EncodeManager::updateVideo(const Region &changed, const ScreenSet &layout, const PixelBuffer *pb) {
+    auto *screen_encoder_manager = dynamic_cast<ScreenEncoderManager<> *>(encoders[encoderKasmVideo]);
+    if (!screen_encoder_manager)
+        return false;
+
+    if (screen_encoder_manager->get_encoder() != conn->cp.encoder) {
+        delete encoders[encoderKasmVideo];
+
+        screen_encoder_manager = new ScreenEncoderManager(ffmpeg,
+            conn->cp.encoder,
+            encoder_probe.get_available_encoders(),
+            conn,
+            encoder_probe.get_drm_device_path(),
+            {0,
+                0,
+                static_cast<uint8_t>(Server::frameRate),
+                static_cast<uint8_t>(Server::groupOfPicture),
+                static_cast<uint8_t>(Server::videoQualityCRFCQP)});
+
+        if (!screen_encoder_manager)
+            return false;
+
+        encoders[encoderKasmVideo] = screen_encoder_manager;
+    }
+
+    if (!screen_encoder_manager->sync_layout(layout, changed))
+        return false;
+
+    static const Palette palette;
+    screen_encoder_manager->writeRect(pb, palette);
+
+    std::vector<Rect> rects;
+    changed.get_rects(&rects);
+    updateVideoStats(rects, pb);
+
+    return true;
 }
 
 void EncodeManager::prepareEncoders(bool allowLossy)
 {
-  enum EncoderClass solid, bitmap, bitmapRLE;
-  enum EncoderClass indexed, indexedRLE, fullColour;
+  EncoderClass bitmap, bitmapRLE;
+  EncoderClass indexedRLE, fullColour;
 
-  rdr::S32 preferred;
-
-  std::vector<int>::iterator iter;
-
-  solid = bitmap = bitmapRLE = encoderRaw;
-  indexed = indexedRLE = fullColour = encoderRaw;
+  auto solid = bitmap = bitmapRLE = encoderRaw;
+  auto indexed = indexedRLE = fullColour = encoderRaw;
 
   // Try to respect the client's wishes
-  preferred = conn->getPreferredEncoding();
+  const auto preferred = conn->getPreferredEncoding();
+  const bool isHighBppSupported = conn->cp.pf().bpp >= 16;
+  const bool isHighBppLossyAllowed = isHighBppSupported && allowLossy;
+
   switch (preferred) {
   case encodingRRE:
     // Horrible for anything high frequency and/or lots of colours
@@ -479,14 +541,11 @@ void EncodeManager::prepareEncoders(bool allowLossy)
     bitmapRLE = indexedRLE = fullColour = encoderHextile;
     break;
   case encodingTight:
-    if (encoders[encoderTightQOI]->isSupported() &&
-        (conn->cp.pf().bpp >= 16))
+    if (encoders[encoderTightQOI]->isSupported() && isHighBppSupported)
       fullColour = encoderTightQOI;
-    else if (encoders[encoderTightWEBP]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightWEBP]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightWEBP;
-    else if (encoders[encoderTightJPEG]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightJPEG]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightJPEG;
     else
       fullColour = encoderTight;
@@ -503,14 +562,11 @@ void EncodeManager::prepareEncoders(bool allowLossy)
   // Any encoders still unassigned?
 
   if (fullColour == encoderRaw) {
-    if (encoders[encoderTightQOI]->isSupported() &&
-        (conn->cp.pf().bpp >= 16))
+    if (encoders[encoderTightQOI]->isSupported() && isHighBppSupported)
       fullColour = encoderTightQOI;
-    else if (encoders[encoderTightWEBP]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightWEBP]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightWEBP;
-    else if (encoders[encoderTightJPEG]->isSupported() &&
-        (conn->cp.pf().bpp >= 16) && allowLossy)
+    else if (encoders[encoderTightJPEG]->isSupported() && isHighBppLossyAllowed)
       fullColour = encoderTightJPEG;
     else if (encoders[encoderZRLE]->isSupported())
       fullColour = encoderZRLE;
@@ -562,10 +618,8 @@ void EncodeManager::prepareEncoders(bool allowLossy)
   activeEncoders[encoderIndexedRLE] = indexedRLE;
   activeEncoders[encoderFullColour] = fullColour;
 
-  for (iter = activeEncoders.begin(); iter != activeEncoders.end(); ++iter) {
-    Encoder *encoder;
-
-    encoder = encoders[*iter];
+  for (const auto activeEncoder : activeEncoders) {
+    auto *encoder = encoders[activeEncoder];
 
     encoder->setCompressLevel(conn->cp.compressLevel);
     encoder->setQualityLevel(conn->cp.qualityLevel);
@@ -636,7 +690,7 @@ int EncodeManager::computeNumRects(const Region& changed)
 
     // No split necessary?
     if ((((w*h) < SubRectMaxArea) && (w < SubRectMaxWidth)) ||
-        (videoDetected && !encoders[encoderTightWEBP]->isSupported())) {
+        (videoDetected && !video_mode_available && !encoders[encoderTightWEBP]->isSupported())) {
       numRects += 1;
       continue;
     }
@@ -655,56 +709,60 @@ int EncodeManager::computeNumRects(const Region& changed)
   return numRects;
 }
 
-Encoder *EncodeManager::startRect(const Rect& rect, int type, const bool trackQuality,
-                                  const uint8_t isWebp)
-{
-  Encoder *encoder;
-  int klass, equiv;
+Encoder *EncodeManager::startRect(const Rect &rect, int type, const bool trackQuality, const startRectOverride overrider) {
+    activeType = type;
 
-  activeType = type;
-  klass = activeEncoders[activeType];
-  if (isWebp)
-    klass = encoderTightWEBP;
+    int klass;
 
-  beforeLength = conn->getOutStream(conn->cp.supportsUdp)->length();
+    switch (overrider) {
+        case STARTRECT_OVERRIDE_WEBP:
+            klass = encoderTightWEBP;
+            break;
+        case STARTRECT_OVERRIDE_KASMVIDEO:
+            klass = encoderKasmVideo;
+            break;
+        default:
+            klass = activeEncoders[activeType];
+    }
 
-  stats[klass][activeType].rects++;
-  stats[klass][activeType].pixels += rect.area();
-  equiv = 12 + rect.area() * (conn->cp.pf().bpp/8);
-  stats[klass][activeType].equivalent += equiv;
+    beforeLength = static_cast<int>(conn->getOutStream(conn->cp.supportsUdp)->length());
 
-  encoder = encoders[klass];
-  conn->writer()->startRect(rect, encoder->encoding);
+    stats[klass][activeType].rects++;
+    stats[klass][activeType].pixels += rect.area();
+    const int equiv = 12 + rect.area() * (conn->cp.pf().bpp >> 3);
+    stats[klass][activeType].equivalent += equiv;
 
-  if (type == encoderFullColour && dynamicQualityMin > -1 && trackQuality) {
-    trackRectQuality(rect);
+    Encoder *encoder = encoders[klass];
+    conn->writer()->startRect(rect, encoder->encoding);
 
-    // Set the dynamic quality here. Unset fine quality, as it would overrule us
-    encoder->setQualityLevel(scaledQuality(rect));
-    encoder->setFineQualityLevel(-1, subsampleUndefined);
-  }
+    if (type == encoderFullColour && dynamicQualityMin > -1 && trackQuality) {
+        trackRectQuality(rect);
 
-  if (encoder->flags & EncoderLossy && (!encoder->treatLossless() || videoDetected))
-    lossyRegion.assign_union(Region(rect));
-  else
-    lossyRegion.assign_subtract(Region(rect));
+        // Set the dynamic quality here. Unset fine quality, as it would overrule us
+        encoder->setQualityLevel(scaledQuality(rect));
+        encoder->setFineQualityLevel(-1, subsampleUndefined);
+    }
 
-  return encoder;
+    if (encoder->flags & EncoderLossy && (!encoder->treatLossless() || videoDetected))
+        lossyRegion.assign_union(Region(rect));
+    else
+        lossyRegion.assign_subtract(Region(rect));
+
+    return encoder;
 }
 
-void EncodeManager::endRect(const uint8_t isWebp)
+void EncodeManager::endRect(const startRectOverride overrider)
 {
-  int klass;
-  int length;
+    conn->writer()->endRect();
+    const auto length = conn->getOutStream(conn->cp.supportsUdp)->length() - beforeLength;
+    auto klass = activeEncoders[activeType];
 
-  conn->writer()->endRect();
+    if (overrider == STARTRECT_OVERRIDE_WEBP)
+        klass = encoderTightWEBP;
+    else if (overrider == STARTRECT_OVERRIDE_KASMVIDEO)
+        klass = encoderKasmVideo;
 
-  length = conn->getOutStream(conn->cp.supportsUdp)->length() - beforeLength;
-
-  klass = activeEncoders[activeType];
-  if (isWebp)
-    klass = encoderTightWEBP;
-  stats[klass][activeType].bytes += length;
+    stats[klass][activeType].bytes += length;
 }
 
 void EncodeManager::writeCopyPassRects(const std::vector<CopyPassRect>& copypassed)
@@ -903,17 +961,14 @@ bool EncodeManager::handleTimeout(Timer* t)
 
 void EncodeManager::updateVideoStats(const std::vector<Rect> &rects, const PixelBuffer* pb)
 {
-  std::vector<Rect>::const_iterator rect;
-  uint32_t i;
-
-  if (!rfb::Server::videoTime) {
-    videoDetected = true;
-    return;
-  }
+    if (!rfb::Server::videoTime) {
+        videoDetected = true;
+        return;
+    }
 
   unsigned area = 0;
   const unsigned samples = rfb::Server::videoTime * rfb::Server::frameRate;
-  for (rect = rects.begin(); rect != rects.end(); ++rect) {
+  for (auto rect = rects.begin(); rect != rects.end(); ++rect) {
     area += rect->area();
   }
   area *= 100;
@@ -924,7 +979,7 @@ void EncodeManager::updateVideoStats(const std::vector<Rect> &rects, const Pixel
   areaCur %= samples;
 
   area = 0;
-  for (i = 0; i < samples; i++)
+  for (uint32_t i = 0; i < samples; i++)
     area += areaPercentages[i];
   area /= samples;
 
@@ -1127,7 +1182,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
     updateVideoStats(rects, pb);
   }
 
-  if (videoDetected) {
+  if (videoDetected && !video_mode_available) {
     rects.clear();
     rects.push_back(pb->getRect());
   }
@@ -1143,7 +1198,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
 
     // No split necessary?
     if ((((w*h) < SubRectMaxArea) && (w < SubRectMaxWidth)) ||
-        (videoDetected && !encoders[encoderTightWEBP]->isSupported())) {
+        (videoDetected && !video_mode_available && !encoders[encoderTightWEBP]->isSupported())) {
       subrects.push_back(rect);
       trackRectQuality(rect);
       continue;
@@ -1188,7 +1243,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
   gettimeofday(&scalestart, NULL);
 
   const PixelBuffer *scaledpb = NULL;
-  if (videoDetected &&
+  if (videoDetected && !video_mode_available &&
       (maxVideoX < pb->getRect().width() || maxVideoY < pb->getRect().height())) {
     const float xdiff = maxVideoX / (float) pb->getRect().width();
     const float ydiff = maxVideoY / (float) pb->getRect().height();
@@ -1263,7 +1318,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
       if (maxEncodingTime < encodingTime)
         maxEncodingTime = encodingTime;
 
-      if (framesSinceEncPrint >= rfb::Server::frameRate) {
+      if (framesSinceEncPrint >= (unsigned) rfb::Server::frameRate) {
         vlog.info("Max encoding time during the last %u frames: %u ms (limit %u, near limit %.0f)",
                   framesSinceEncPrint, maxEncodingTime, 1000/rfb::Server::frameRate,
                   1000/rfb::Server::frameRate * 0.8f);
@@ -1278,7 +1333,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb,
 
   for (uint32_t i = 0; i < subrects_size; ++i) {
     if (encCache->enabled && !compresseds[i].empty() && !fromCache[i] &&
-        !encoders[encoderTightQOI]->isSupported()) {
+    !encoders[encoderTightQOI]->isSupported()) {
       void *tmp = malloc(compresseds[i].size());
       memcpy(tmp, &compresseds[i][0], compresseds[i].size());
       encCache->add(isWebp[i] ? encoderTightWEBP : encoderTightJPEG,
@@ -1302,12 +1357,11 @@ uint8_t EncodeManager::getEncoderType(const Rect& rect, const PixelBuffer *pb,
   struct RectInfo info;
   unsigned int maxColours = 256;
   PixelBuffer *ppb;
-  Encoder *encoder;
 
   bool useRLE;
   EncoderType type;
 
-  encoder = encoders[activeEncoders[encoderIndexedRLE]];
+  const Encoder *encoder = encoders[activeEncoders[encoderIndexedRLE]];
   if (maxColours > encoder->maxPaletteSize)
     maxColours = encoder->maxPaletteSize;
   encoder = encoders[activeEncoders[encoderIndexed]];
@@ -1357,7 +1411,9 @@ uint8_t EncodeManager::getEncoderType(const Rect& rect, const PixelBuffer *pb,
     struct timeval start;
     gettimeofday(&start, NULL);
 
-    if (encCache->enabled &&
+    if (encCache && video_mode_available) {
+      // nop, send this as a skip rect
+    } else if (encCache->enabled &&
         (data = encCache->get(activeEncoders[encoderFullColour],
                               rect.tl.x, rect.tl.y, rect.width(), rect.height(),
                               len))) {
@@ -1428,7 +1484,7 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb,
   PixelBuffer *ppb;
   Encoder *encoder;
 
-  encoder = startRect(rect, type, compressed.size() == 0, isWebp);
+  encoder = startRect(rect, type, compressed.size() == 0, isWebp ? STARTRECT_OVERRIDE_WEBP : STARTRECT_NO_OVERRIDE);
 
   if (compressed.size()) {
     if (isWebp) {
@@ -1444,7 +1500,7 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb,
       jpegstats.area += rect.area();
       jpegstats.rects++;
     }
-  } else {
+    } else {
     if (encoder->flags & EncoderUseNativePF) {
       ppb = preparePixelBuffer(rect, pb, false);
     } else {
@@ -1455,7 +1511,7 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb,
     delete ppb;
   }
 
-  endRect(isWebp);
+  endRect(isWebp ? STARTRECT_OVERRIDE_WEBP : STARTRECT_NO_OVERRIDE);
 }
 
 bool EncodeManager::checkSolidTile(const Rect& r, const rdr::U8* colourValue,

@@ -1,5 +1,5 @@
 set(RFB_SOURCES
-        benchmark.cxx
+        benchmark/benchmark.cxx
         Blacklist.cxx
         Congestion.cxx
         CConnection.cxx
@@ -69,6 +69,15 @@ set(RFB_SOURCES
         util.cxx
         xxhash.c
         ffmpeg.cxx
+        encoders/SoftwareEncoder.cxx
+        benchmark/FfmpegFrameFeeder.cpp
+        encoders/ScreenEncoderManager.cxx
+        encoders/FFMPEGVAAPIEncoder.cxx
+        encoders/ScreenEncoderManager.cxx
+        encoders/VideoEncoderFactory.cxx
+        encoders/EncoderProbe.cpp
+        encoders/EncoderConfiguration.cpp
+        encoders/utils.cpp
 )
 
 if (UNIX)
@@ -131,8 +140,9 @@ endif ()
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale)
 pkg_check_modules(CPUID REQUIRED libcpuid)
+pkg_check_modules(FMT REQUIRED fmt)
+pkg_check_modules(VIDEO_ACCELERATION REQUIRED libva libva-drm libdrm)
 
 find_package(TBB)
 if (TBB_FOUND)
@@ -155,7 +165,14 @@ target_include_directories(rfb PRIVATE
         ${CPUID_INCLUDE_DIRS}
 )
 
-target_link_libraries(rfb PUBLIC ${RFB_LIBRARIES} tinyxml2_objs ${TBB_LIBRARIES} ${CPUID_LIBRARIES})
+set(RFB_LIBRARIES ${RFB_LIBRARIES} tinyxml2_objs ${TBB_LIBRARIES} ${CPUID_LIBRARIES} ${FMT_LIBRARIES} ${VIDEO_ACCELERATION_LIBRARIES})
+
+if (DEBUG_FFMPEG)
+    set(RFB_LIBRARIES ${RFB_LIBRARIES} ${FFMPEG_LIBRARIES})
+endif ()
+
+target_include_directories(rfb PUBLIC ${VIDEO_ACCELERATION_INCLUDE_DIRS})
+target_link_libraries(rfb PUBLIC ${RFB_LIBRARIES})
 
 if (UNIX)
     libtool_create_control_file(rfb)

@@ -27,17 +27,17 @@ namespace rfb {
   class TightQOIEncoder : public Encoder {
   public:
     TightQOIEncoder(SConnection* conn);
-    virtual ~TightQOIEncoder();
+    ~TightQOIEncoder() override = default;
 
-    virtual bool isSupported();
+    bool isSupported() const override;
 
-    virtual void writeRect(const PixelBuffer* pb, const Palette& palette);
+    void writeRect(const PixelBuffer* pb, const Palette& palette) override;
     virtual void compressOnly(const PixelBuffer* pb, const uint8_t quality,
                               std::vector<uint8_t> &out, const bool lowVideoQuality) const;
     virtual void writeOnly(const std::vector<uint8_t> &out) const;
-    virtual void writeSolidRect(int width, int height,
+    void writeSolidRect(int width, int height,
                                 const PixelFormat& pf,
-                                const rdr::U8* colour);
+                                const rdr::U8* colour) override;
 
   protected:
     void writeCompact(rdr::U32 value, rdr::OutStream* os) const;

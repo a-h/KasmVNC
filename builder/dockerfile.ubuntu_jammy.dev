@@ -7,6 +7,7 @@ ENV XORG_PATCH 21
 ENV DEBIAN_FRONTEND noninteractive
 
 EXPOSE 6901
+EXPOSE 22
 
 USER root
 
@@ -54,18 +55,32 @@ RUN sed -i 's$# deb-src$deb-src$' /etc/apt/sources.list && \
     x11proto-dev \
     libgbm-dev \
     htop \
-    inotify-tools && \
-    echo "kasm-user  ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    libva-dev \
+    libpam0g-dev \
+    libbsd-dev \
+    openssh-server \
+    inotify-tools
+
+RUN echo "kasm-user  ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
+    mkdir -p /var/run/sshd && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 RUN apt install -y nodejs nginx
+
+# Packages required for VA-API hardware acceleration (Mesa + Intel)
+RUN apt install -y vainfo mesa-va-drivers mesa-vulkan-drivers \
+    intel-media-va-driver-non-free
 
 ENV SCRIPTS_DIR=/tmp/scripts
 COPY builder/scripts $SCRIPTS_DIR
 RUN $SCRIPTS_DIR/build-deps.sh
 
+RUN ssh-keygen -A
+RUN echo "kasm-user:password" | chpasswd
+
 USER 1000
 
 WORKDIR /src
 
-ENTRYPOINT /bin/bash
+ENTRYPOINT ["/bin/bash", "-c", "sudo /usr/sbin/sshd && exec /bin/bash"]

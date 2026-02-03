@@ -49,11 +49,7 @@ HextileEncoder::HextileEncoder(SConnection* conn) :
 {
 }
 
-HextileEncoder::~HextileEncoder()
-{
-}
-
-bool HextileEncoder::isSupported()
+bool HextileEncoder::isSupported() const
 {
   return conn->cp.supportsEncoding(encodingHextile);
 }

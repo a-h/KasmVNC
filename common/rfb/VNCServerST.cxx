@@ -71,11 +71,15 @@
 
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <filesystem>
+#include <string_view>
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <wordexp.h>
-#include <filesystem>
-#include <string_view>
+
+#include <fmt/core.h>
+#include "encoders/KasmVideoConstants.h"
+#include "encoders/EncoderProbe.h"
 
 using namespace rfb;
 
@@ -131,7 +135,7 @@ static void parseRegionPart(const bool percents, rdr::U16 &pcdest, int &dest,
   *inptr = ptr;
 }
 
-VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
+VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_, const video_encoders::EncoderProbe &encoder_probe_)
   : blHosts(&blacklist), desktop(desktop_), desktopStarted(false),
     blockCounter(0), pb(nullptr), blackedpb(nullptr), ledState(ledUnknown),
     name(strDup(name_)), pointerClient(nullptr), clipboardClient(nullptr),
@@ -140,7 +144,7 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
     queryConnectionHandler(nullptr), keyRemapper(&KeyRemapper::defInstance),
     lastConnectionTime(0), disableclients(false),
     frameTimer(this), apimessager(nullptr), trackingFrameStats(0),
-    clipboardId(0), sendWatermark(false)
+    clipboardId(0), sendWatermark(false), encoder_probe(encoder_probe_)
 {
     auto to_string = [](const bool value) {
         return value ? "yes" : "no";
@@ -153,6 +157,19 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
               to_string(cpu_info::has_sse4_1),
               to_string(cpu_info::has_sse4_2),
               to_string(cpu_info::has_avx512f));
+
+    std::string available_accelerators{};
+    for (const auto encoder: encoder_probe.get_available_encoders()) {
+        if (KasmVideoEncoders::is_accelerated(encoder)) {
+            if (!available_accelerators.empty())
+                available_accelerators.append(", ");
+
+            available_accelerators.append(KasmVideoEncoders::to_string(encoder));
+        }
+    }
+
+    slog.info("Hardware video encoding acceleration capability: %s",
+        available_accelerators.empty() ? "none" : available_accelerators.c_str());
 
   DLPRegion.enabled = DLPRegion.percents = false;
 
@@ -221,14 +238,14 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
 
   if (kasmpasswdpath[0] && access(kasmpasswdpath, R_OK) == 0) {
     // Set up a watch on the password file
-    inotifyfd = inotify_init();
-    if (inotifyfd < 0)
+    inotify_fd = inotify_init();
+    if (inotify_fd < 0)
       slog.error("Failed to init inotify");
 
-    int flags = fcntl(inotifyfd, F_GETFL, 0);
-    fcntl(inotifyfd, F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(inotify_fd, F_GETFL, 0);
+    fcntl(inotify_fd, F_SETFL, flags | O_NONBLOCK);
 
-    if (inotify_add_watch(inotifyfd, kasmpasswdpath, IN_CLOSE_WRITE | IN_DELETE_SELF) < 0)
+    if (inotify_add_watch(inotify_fd, kasmpasswdpath, IN_CLOSE_WRITE | IN_DELETE_SELF) < 0)
       slog.error("Failed to set watch");
   }
 
@@ -241,9 +258,9 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
         SelfBench();
 
     if (Server::benchmark[0]) {
-        auto *file_name = Server::benchmark.getValueStr();
+        const auto *file_name = Server::benchmark.getValueStr();
         if (!std::filesystem::exists(file_name))
-            throw Exception("Benchmarking video file does not exist");
+            throw std::invalid_argument("Benchmarking video file does not exist");
         benchmark(file_name, Server::benchmarkResults.getValueStr());
     }
 }
@@ -298,7 +315,7 @@ void VNCServerST::addSocket(network::Socket* sock, bool outgoing)
     lastConnectionTime = time(0);
   }
 
-  VNCSConnectionST* client = new VNCSConnectionST(this, sock, outgoing);
+  VNCSConnectionST* client = new VNCSConnectionST(this, sock, encoder_probe, outgoing);
   client->init();
 
   if (watermarkData)
@@ -1062,16 +1079,16 @@ void VNCServerST::writeUpdate()
 
   // Check if the password file was updated
   bool permcheck = false;
-  if (inotifyfd >= 0) {
+  if (inotify_fd >= 0) {
     char buf[256];
-    int ret = read(inotifyfd, buf, 256);
+    int ret = read(inotify_fd, buf, 256);
     int pos = 0;
     while (ret > 0) {
       const struct inotify_event * const ev = (struct inotify_event *) &buf[pos];
 
       if (ev->mask & IN_IGNORED) {
         // file was deleted, set new watch
-        if (inotify_add_watch(inotifyfd, kasmpasswdpath, IN_CLOSE_WRITE | IN_DELETE_SELF) < 0)
+        if (inotify_add_watch(inotify_fd, kasmpasswdpath, IN_CLOSE_WRITE | IN_DELETE_SELF) < 0)
           slog.error("Failed to set watch");
       }
 

@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
- 
+
 #include <network/GetAPI.h>
 #include <network/TcpSocket.h>
 
@@ -36,18 +36,19 @@
 #define XK_MISCELLANY
 #define XK_XKB_KEYS
 #include <rfb/keysymdef.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <stdint.h>
+#include <cctype>
+#include <cstdlib>
+#include <cstdint>
 #include <wordexp.h>
 
+#include "encoders/EncoderProbe.h"
 #include "kasmpasswd.h"
 
 using namespace rfb;
 
 static LogWriter vlog("VNCSConnST");
 
-static Cursor emptyCursor(0, 0, Point(0, 0), NULL);
+static Cursor emptyCursor(0, 0, Point(0, 0), nullptr);
 
 namespace {
 const rdr::U32 CLIENT_KEEPALIVE_KEYSYM = 1;
@@ -57,19 +58,19 @@ extern rfb::BoolParameter disablebasicauth;
 
 extern "C" char unixrelaynames[MAX_UNIX_RELAYS][MAX_UNIX_RELAY_NAME_LEN];
 
-VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
+VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s, const video_encoders::EncoderProbe &encoder_probe,
                                    bool reverse)
   : upgradingToUdp(false), sock(s), reverseConnection(reverse),
     inProcessMessages(false),
     pendingSyncFence(false), syncFence(false), fenceFlags(0),
-    fenceDataLen(0), fenceData(NULL), congestionTimer(this),
+    fenceDataLen(0), fenceData(nullptr), congestionTimer(this),
     losslessTimer(this), kbdLogTimer(this), binclipTimer(this),
     server(server_), updates(false),
     updateRenderedCursor(false), removeRenderedCursor(false),
-    continuousUpdates(false), encodeManager(this, &VNCServerST::encCache),
+    continuousUpdates(false), encodeManager(this, &VNCServerST::encCache, FFmpeg::get(), encoder_probe),
     needsPermCheck(false), pointerEventTime(0),
     clientHasCursor(false),
-    accessRights(AccessDefault), startTime(time(0)), frameTracking(false),
+    accessRights(AccessDefault), startTime(time(nullptr)), frameTracking(false),
     udpFramesSinceFull(0), complainedAboutNoViewRights(false), clientUsername("username_unavailable")
 {
   setStreams(&sock->inStream(), &sock->outStream());
@@ -77,11 +78,7 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
   VNCServerST::connectionsLog.write(1,"accepted: %s", peerEndpoint.buf);
 
   memset(bstats_total, 0, sizeof(bstats_total));
-  gettimeofday(&connStart, NULL);
-
-  unsigned i;
-  for (i = 0; i < MAX_UNIX_RELAYS; i++)
-    unixRelaySubscriptions[i][0] = '\0';
+  gettimeofday(&connStart, nullptr);
 
   // Check their permissions, if applicable
   kasmpasswdpath[0] = '\0';
@@ -93,9 +90,11 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
 
   user[0] = '\0';
   const char *at = strrchr(peerEndpoint.buf, '@');
-  if (at && at - peerEndpoint.buf > 1 && at - peerEndpoint.buf < USERNAME_LEN) {
-    memcpy(user, peerEndpoint.buf, at - peerEndpoint.buf);
-    user[at - peerEndpoint.buf] = '\0';
+
+  const auto offset = at - peerEndpoint.buf;
+  if (at && offset > 1 && static_cast<size_t>(offset) < USERNAME_LEN) {
+    memcpy(user, peerEndpoint.buf, offset);
+    user[offset] = '\0';
   }
 
   bool read, write, owner;
@@ -111,10 +110,12 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
 
   // Configure the socket
   setSocketTimeouts();
-  lastEventTime = time(0);
-  gettimeofday(&lastRealUpdate, NULL);
-  gettimeofday(&lastClipboardOp, NULL);
-  gettimeofday(&lastKeyEvent, NULL);
+  lastEventTime = time(nullptr);
+  gettimeofday(&lastRealUpdate, nullptr);
+  gettimeofday(&lastClipboardOp, nullptr);
+  gettimeofday(&lastKeyEvent, nullptr);
+
+  cp.available_encoders = encoder_probe.get_available_encoders();
 
   server->clients.push_front(this);
 
@@ -144,7 +145,7 @@ VNCSConnectionST::~VNCSConnectionST()
   }
 
   if (server->pointerClient == this)
-    server->pointerClient = 0;
+    server->pointerClient = nullptr;
 
   // Remove this client from the server
   server->clients.remove(this);
@@ -180,7 +181,7 @@ void VNCSConnectionST::close(const char* reason)
     vlog.debug("second close: %s (%s)", peerEndpoint.buf, reason);
 
   if (authenticated()) {
-      server->lastDisconnectTime = time(0);
+      server->lastDisconnectTime = time(nullptr);
 
       // First update the client state to CLOSING to ensure it's not included in user lists
       setState(RFBSTATE_CLOSING);
@@ -544,7 +545,7 @@ int VNCSConnectionST::checkIdleTimeout()
   if (idleTimeout == 0) return 0;
   if (state() != RFBSTATE_NORMAL && idleTimeout < 15)
     idleTimeout = 15; // minimum of 15 seconds while authenticating
-  time_t now = time(0);
+  time_t now = time(nullptr);
   if (now < lastEventTime) {
     // Someone must have set the time backwards.  Set lastEventTime so that the
     // idleTimeout will count from now.
@@ -632,7 +633,7 @@ bool VNCSConnectionST::needRenderedCursor()
       !cp.supportsLocalCursor && !cp.supportsLocalXCursor)
     return true;
   if (!server->cursorPos.equals(pointerEventPos) &&
-      (time(0) - pointerEventTime) > 0)
+      (time(nullptr) - pointerEventTime) > 0)
     return true;
 
   return false;
@@ -1520,7 +1521,7 @@ void VNCSConnectionST::writeDataUpdate()
 
   // Does the client need a server-side rendered cursor?
 
-  cursor = NULL;
+  cursor = nullptr;
   if (needRenderedCursor()) {
     Rect renderedCursorRect;
 
@@ -1559,7 +1560,7 @@ void VNCSConnectionST::writeDataUpdate()
       msSince(&lastRealUpdate) < losslessThreshold))
     return;
 
-  writeRTTPing();
+  // writeRTTPing();
 
   // FIXME: If continuous updates aren't used then the client might
   //        be slower than frameRate in its requests and we could
@@ -1570,9 +1571,9 @@ void VNCSConnectionST::writeDataUpdate()
                   server->msToNextUpdate() / 1000;
 
   if (!ui.is_empty()) {
-    encodeManager.writeUpdate(ui, server->getPixelBuffer(), cursor, maxUpdateSize);
+    encodeManager.writeUpdate(ui, server->screenLayout, server->getPixelBuffer(), cursor, maxUpdateSize);
     copypassed.clear();
-    gettimeofday(&lastRealUpdate, NULL);
+    gettimeofday(&lastRealUpdate, nullptr);
     losslessTimer.start(losslessThreshold);
 
     const unsigned ms = encodeManager.getEncodingTime();
@@ -1596,11 +1597,11 @@ void VNCSConnectionST::writeDataUpdate()
         bstats_total[BS_CPU_CLOSE]++;
     }
   } else {
-    encodeManager.writeLosslessRefresh(req, server->getPixelBuffer(),
+    encodeManager.writeLosslessRefresh(req, server->screenLayout, server->getPixelBuffer(),
                                        cursor, maxUpdateSize);
   }
 
-  writeRTTPing();
+ //  writeRTTPing();
 
   // The request might be for just part of the screen, so we cannot
   // just clear the entire update tracker.
@@ -1622,7 +1623,7 @@ void VNCSConnectionST::writeBinaryClipboard()
 
   writer()->writeBinaryClipboard(binaryClipboard);
 
-  gettimeofday(&lastClipboardOp, NULL);
+  gettimeofday(&lastClipboardOp, nullptr);
 }
 
 void VNCSConnectionST::screenLayoutChange(rdr::U16 reason)
@@ -1910,6 +1911,10 @@ void VNCSConnectionST::unixRelay(const char *name, const rdr::U8 *buf, const uns
       return;
     }
   }
+}
+
+void VNCSConnectionST::videoEncodersRequest(const std::vector<int32_t> &encoders) {
+    writer()->writeVideoEncoders(encoders);
 }
 
 void VNCSConnectionST::sendUnixRelayData(const char name[], const unsigned char *buf,

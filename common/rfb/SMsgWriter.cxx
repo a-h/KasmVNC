@@ -1,38 +1,33 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
  * Copyright (C) 2011 D. R. Commander.  All Rights Reserved.
  * Copyright 2009-2017 Pierre Ossman for Cendio AB
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
-#include <stdio.h>
 #include <string>
 #include <rdr/OutStream.h>
-#include <rdr/MemOutStream.h>
-#include <rdr/ZlibOutStream.h>
-
-#include <rfb/msgTypes.h>
-#include <rfb/fenceTypes.h>
-#include <rfb/clipboardTypes.h>
-#include <rfb/Exception.h>
 #include <rfb/ConnParams.h>
-#include <rfb/UpdateTracker.h>
-#include <rfb/Encoder.h>
-#include <rfb/SMsgWriter.h>
+#include <rfb/Exception.h>
 #include <rfb/LogWriter.h>
+#include <rfb/SMsgWriter.h>
+#include <rfb/UpdateTracker.h>
+#include <rfb/encoders/EncoderConfiguration.h>
+#include <rfb/fenceTypes.h>
 #include <rfb/ledStates.h>
+#include <rfb/msgTypes.h>
 
 using namespace rfb;
 
@@ -47,10 +42,6 @@ SMsgWriter::SMsgWriter(ConnParams* cp_, rdr::OutStream* os_, rdr::OutStream* udp
     needSetVMWareCursor(false),
     needCursorPos(false),
     needLEDState(false), needQEMUKeyEvent(false)
-{
-}
-
-SMsgWriter::~SMsgWriter()
 {
 }
 
@@ -776,6 +767,37 @@ void SMsgWriter::writeUnixRelay(const char *name, const rdr::U8 *buf, const unsi
   os->writeBytes(buf, len);
 
   endMsg();
+}
+
+void SMsgWriter::writeVideoEncoders(const std::vector<int32_t> &encoders) {
+    startMsg(msgTypeVideoEncoders);
+
+    std::vector<int32_t> conjunction;
+
+    for (const auto encoder: cp->available_encoders) {
+        if (std::find(encoders.begin(), encoders.end(), KasmVideoEncoders::to_streaming_mode(encoder)) != encoders.end()) {
+            conjunction.push_back(KasmVideoEncoders::to_encoding(encoder));
+        }
+    }
+
+    const uint8_t size = conjunction.size();
+    os->writeU8(size);
+
+    for (auto encoder: conjunction) {
+        os->writeS32(encoder);
+
+        const auto &config = EncoderConfiguration::get_configuration(KasmVideoEncoders::from_encoding(encoder));
+
+        os->writeS32(config.min_quality);
+        os->writeS32(config.max_quality);
+
+        os->writeU8(config.presets.size());
+        for (const auto &preset_value: config.presets) {
+            os->writeS32(preset_value);
+        }
+    }
+
+    endMsg();
 }
 
 void SMsgWriter::writeUserJoinedSession(const std::string& username)

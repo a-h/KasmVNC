@@ -19,25 +19,22 @@
  */
 
 #include "benchmark.h"
-#include <string_view>
-#include <rfb/LogWriter.h>
-#include <numeric>
-#include <tinyxml2.h>
 #include <algorithm>
 #include <cassert>
-
-#include "ServerCore.h"
 #include <cmath>
-
-#include "EncCache.h"
-#include "EncodeManager.h"
-#include "SConnection.h"
-#include "screenTypes.h"
-#include "SMsgWriter.h"
-#include "UpdateTracker.h"
-#include "rdr/BufferedInStream.h"
-#include "rdr/OutStream.h"
-#include "ffmpeg.h"
+#include <numeric>
+#include <rdr/BufferedInStream.h>
+#include <rdr/OutStream.h>
+#include <rfb/EncCache.h>
+#include <rfb/EncodeManager.h>
+#include <rfb/SConnection.h>
+#include <rfb/SMsgWriter.h>
+#include <rfb/UpdateTracker.h>
+#include <rfb/screenTypes.h>
+#include <string_view>
+#include <tinyxml2.h>
+#include "FfmpegFrameFeeder.h"
+#include "rfb/LogWriter.h"
 
 namespace benchmarking {
     class MockBufferStream final : public rdr::BufferedInStream {
@@ -87,49 +84,43 @@ namespace benchmarking {
 
         ~MockSConnection() override = default;
 
-        void writeUpdate(const rfb::UpdateInfo &ui, const rfb::PixelBuffer *pb) {
+        void writeUpdate(const rfb::UpdateInfo &ui, const ScreenSet &layout, const rfb::PixelBuffer *pb) {
             cache.clear();
 
             manager.clearEncodingTime();
             if (!ui.is_empty()) {
-                manager.writeUpdate(ui, pb, nullptr);
+                manager.writeUpdate(ui, layout, pb, nullptr);
             } else {
                 rfb::Region region{pb->getRect()};
-                manager.writeLosslessRefresh(region, pb, nullptr, 2000);
+                manager.writeLosslessRefresh(region, layout, pb, nullptr, 2000);
             }
         }
 
-        void setDesktopSize(int fb_width, int fb_height,
-                            const rfb::ScreenSet &layout) override {
+        void setDesktopSize(int fb_width, int fb_height, const rfb::ScreenSet &layout) override {
             cp.width = fb_width;
             cp.height = fb_height;
             cp.screenLayout = layout;
 
-            writer()->writeExtendedDesktopSize(rfb::reasonServer, 0, cp.width, cp.height,
-                                               cp.screenLayout);
+            writer()->writeExtendedDesktopSize(rfb::reasonServer, 0, cp.width, cp.height, cp.screenLayout);
         }
 
-        void sendStats(const bool toClient) override {
-        }
+        void sendStats(const bool toClient) override {}
 
         [[nodiscard]] bool canChangeKasmSettings() const override {
             return true;
         }
 
-        void udpUpgrade(const char *resp) override {
-        }
+        void udpUpgrade(const char *resp) override {}
 
-        void udpDowngrade(const bool) override {
-        }
+        void udpDowngrade(const bool) override {}
 
-        void subscribeUnixRelay(const char *name) override {
-        }
+        void subscribeUnixRelay(const char *name) override {}
 
-        void unixRelay(const char *name, const rdr::U8 *buf, const unsigned len) override {
-        }
+        void unixRelay(const char *name, const rdr::U8 *buf, const unsigned len) override {}
 
-        void handleFrameStats(rdr::U32 all, rdr::U32 render) override {
-        }
+        void videoEncodersRequest(const std::vector<int32_t> &encoders) override {}
+
+        void handleFrameStats(rdr::U32 all, rdr::U32 render) override {}
 
         [[nodiscard]] auto getJpegStats() const {
             return manager.jpegstats;
@@ -139,15 +130,19 @@ namespace benchmarking {
             return manager.webpstats;
         }
 
-        [[nodiscard]] auto bytes() { return out.length(); }
-        [[nodiscard]] auto udp_bytes() { return udps.length(); }
+        [[nodiscard]] auto bytes() {
+            return out.length();
+        }
+        [[nodiscard]] auto udp_bytes() {
+            return udps.length();
+        }
 
     protected:
         MockStream out{};
         MockStream udps{};
 
         EncCache cache{};
-        EncodeManager manager{this, &cache};
+        EncodeManager manager{this, &cache, FFmpeg::get(), video_encoders::EncoderProbe::get(FFmpeg::get(), {}, nullptr)};
     };
 
     class MockCConnection final : public MockTestConnection {
@@ -173,8 +168,7 @@ namespace benchmarking {
         }
 
         void setCursor(int width, int height, const rfb::Point &hotspot, const rdr::U8 *data,
-                       const bool resizing) override {
-        }
+                       const bool resizing) override {}
 
         ~MockCConnection() override = default;
 
@@ -238,23 +232,18 @@ namespace benchmarking {
             updates.add_changed(pb->getRect());
 
             updates.getUpdateInfo(&ui, clip);
-            sc.writeUpdate(ui, pb);
+            sc.writeUpdate(ui, screen_layout, pb);
         }
 
-        void dataRect(const rfb::Rect &r, int encoding) override {
-        }
+        void dataRect(const rfb::Rect &r, int encoding) override {}
 
-        void setColourMapEntries(int, int, rdr::U16 *) override {
-        }
+        void setColourMapEntries(int, int, rdr::U16 *) override {}
 
-        void bell() override {
-        }
+        void bell() override {}
 
-        void serverCutText(const char *, rdr::U32) override {
-        }
+        void serverCutText(const char *, rdr::U32) override {}
 
-        void serverCutText(const char *str) override {
-        }
+        void serverCutText(const char *str) override {}
 
     protected:
         MockBufferStream in;
@@ -262,10 +251,10 @@ namespace benchmarking {
         rfb::SimpleUpdateTracker updates;
         MockSConnection sc;
     };
-}
+} // namespace benchmarking
 
 void report(std::vector<uint64_t> &totals, std::vector<uint64_t> &timings,
-            std::vector<benchmarking::MockCConnection::stats_t> &stats, const std::string_view results_file) {
+            const std::vector<benchmarking::MockCConnection::stats_t> &stats, const std::string_view results_file) {
     auto totals_sum = std::accumulate(totals.begin(), totals.end(), 0.);
     auto totals_avg = totals_sum / static_cast<double>(totals.size());
 
@@ -354,11 +343,15 @@ void report(std::vector<uint64_t> &totals, std::vector<uint64_t> &timings,
 void benchmark(std::string_view path, const std::string_view results_file) {
     try {
         vlog.info("Benchmarking with video file %s", path.data());
-        FFmpegFrameFeeder frame_feeder{};
+        auto &ffmpeg = FFmpeg::get();
+        if (!ffmpeg.is_available())
+            throw std::runtime_error("FFmpeg is not available");
+
+        FfmpegFrameFeeder frame_feeder{&ffmpeg};
         frame_feeder.open(path);
 
         static const rfb::PixelFormat pf{32, 24, false, true, 0xFF, 0xFF, 0xFF, 0, 8, 16};
-        std::vector<rdr::S32> encodings{
+        const std::vector<rdr::S32> encodings{
             std::begin(benchmarking::default_encodings), std::end(benchmarking::default_encodings)
         };
 

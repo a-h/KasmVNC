@@ -1,16 +1,16 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
  * Copyright 2014 Pierre Ossman for Cendio AB
- * 
+ *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this software; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
@@ -29,18 +29,19 @@
 #include <rfb/Cursor.h>
 #include <rfb/PixelFormat.h>
 #include <rfb/ScreenSet.h>
+#include <rfb/encoders/KasmVideoEncoders.h>
 
 namespace rdr { class InStream; }
 
 namespace rfb {
 
-  const int subsampleUndefined = -1;
-  const int subsampleNone = 0;
-  const int subsampleGray = 1;
-  const int subsample2X = 2;
-  const int subsample4X = 3;
-  const int subsample8X = 4;
-  const int subsample16X = 5;
+  constexpr int subsampleUndefined = -1;
+  constexpr int subsampleNone = 0;
+  constexpr int subsampleGray = 1;
+  constexpr int subsample2X = 2;
+  constexpr int subsample4X = 3;
+  constexpr int subsample8X = 4;
+  constexpr int subsample16X = 5;
 
   class SMsgHandler;
 
@@ -91,7 +92,7 @@ namespace rfb {
 
     void setEncodings(int nEncodings, const rdr::S32* encodings);
 
-    unsigned int ledState() { return ledState_; }
+    unsigned int ledState() const { return ledState_; }
     void setLEDState(unsigned int state);
 
     rdr::U32 clipboardFlags() const { return clipFlags; }
@@ -143,6 +144,8 @@ namespace rfb {
     };
 
     bool kasmPassed[KASM_NUM_SETTINGS];
+      KasmVideoEncoders::Encoder encoder{KasmVideoEncoders::Encoder::unavailable};
+      KasmVideoEncoders::Encoders available_encoders;
 
   private:
 

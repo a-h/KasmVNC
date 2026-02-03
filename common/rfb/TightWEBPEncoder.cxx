@@ -90,7 +90,7 @@ TightWEBPEncoder::~TightWEBPEncoder()
 {
 }
 
-bool TightWEBPEncoder::isSupported()
+bool TightWEBPEncoder::isSupported() const
 {
   if (!conn->cp.supportsEncoding(encodingTight))
     return false;

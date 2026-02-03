@@ -29,7 +29,7 @@ namespace rfb {
     TightWEBPEncoder(SConnection* conn);
     virtual ~TightWEBPEncoder();
 
-    virtual bool isSupported();
+    bool isSupported() const override;
 
     virtual void setQualityLevel(int level);
     virtual void setFineQualityLevel(int quality, int subsampling);

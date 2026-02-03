@@ -23,15 +23,13 @@
 
 namespace rfb {
 
-  class HextileEncoder : public Encoder {
-  public:
-    HextileEncoder(SConnection* conn);
-    virtual ~HextileEncoder();
-    virtual bool isSupported();
-    virtual void writeRect(const PixelBuffer* pb, const Palette& palette);
-    virtual void writeSolidRect(int width, int height,
-                                const PixelFormat& pf,
-                                const rdr::U8* colour);
-  };
+    class HextileEncoder : public Encoder {
+    public:
+        HextileEncoder(SConnection* conn);
+        ~HextileEncoder() override = default;
+        bool isSupported() const override;
+        void writeRect(const PixelBuffer* pb, const Palette& palette) override;
+            void writeSolidRect(int width, int height, const PixelFormat &pf, const rdr::U8 *colour) override;
+    };
 }
 #endif

@@ -217,6 +217,8 @@ if(ENABLE_PAM)
 endif()
 set(HAVE_PAM ${ENABLE_PAM})
 
+option(DEBUG_FFMPEG "Debug ffmpeg" OFF)
+
 # Check for SSE2
 check_cxx_compiler_flag(-msse2 COMPILER_SUPPORTS_SSE2)
 
@@ -226,6 +228,9 @@ add_definitions(-DHAVE_CONFIG_H)
 include_directories(${CMAKE_BINARY_DIR})
 
 include(cmake/StaticBuild.cmake)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale libva)
 
 add_subdirectory(third_party)
 add_subdirectory(common)

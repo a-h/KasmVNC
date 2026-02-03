@@ -262,7 +262,18 @@ rfb::BoolParameter rfb::Server::printVideoArea
 ("PrintVideoArea",
  "Print the detected video area % value.",
  false);
-
+rfb::IntParameter rfb::Server::videoQualityCRFCQP
+("VideoQualityCRFCQP",
+ "The CRF/CPQ value to use when encoding video",
+ 17, 0, 63);
+rfb::IntParameter rfb::Server::groupOfPicture
+("GroupOfPicture",
+ "The number of frames to group together for encoding",
+ 24, 0, 100);
+rfb::StringParameter rfb::Server::driNode
+("drinode",
+ "Path to the hardware acceleration device (e.g. /dev/dri/renderD128)",
+ "");
 rfb::StringParameter rfb::Server::kasmPasswordFile
 ("KasmPasswordFile",
  "Password file for BasicAuth, created with the kasmvncpasswd utility.",
@@ -286,6 +297,11 @@ rfb::IntParameter rfb::Server::udpPort
 ("udpPort",
  "Which port to use for UDP. Default same as websocket",
  0, 0, 65535);
+
+rfb::StringParameter rfb::Server::videoCodec
+("videoCodec",
+ "If set, use this codec to send a video stream for WebCodecs. Supported options: auto, h264, h264_vaapi, h265, h265_vaapi, av1, av1_vaapi",
+ "");
 
 static void bandwidthPreset() {
     rfb::Server::dynamicQualityMin.setParam(2);

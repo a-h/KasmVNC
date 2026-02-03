@@ -26,15 +26,17 @@
 
 #include <sys/time.h>
 
-#include <rfb/EncCache.h>
-#include <rfb/SDesktop.h>
-#include <rfb/VNCServer.h>
-#include <rfb/LogWriter.h>
+#include <network/Socket.h>
 #include <rfb/Blacklist.h>
 #include <rfb/Cursor.h>
-#include <rfb/Timer.h>
-#include <network/Socket.h>
+#include <rfb/EncCache.h>
+#include <rfb/LogWriter.h>
+#include <rfb/SDesktop.h>
 #include <rfb/ScreenSet.h>
+#include <rfb/Timer.h>
+#include <rfb/VNCServer.h>
+#include <rfb/encoders/KasmVideoConstants.h>
+#include <rfb/encoders/EncoderProbe.h>
 #include <string>
 
 namespace rfb {
@@ -52,7 +54,7 @@ namespace rfb {
     // -=- Constructors
 
     //   Create a server exporting the supplied desktop.
-    VNCServerST(const char* name_, SDesktop* desktop_);
+    VNCServerST(const char* name_, SDesktop* desktop_, const video_encoders::EncoderProbe &encoder_probe);
     virtual ~VNCServerST();
 
 
@@ -278,7 +280,7 @@ namespace rfb {
 
     Timer frameTimer;
 
-    int inotifyfd;
+    int inotify_fd{-1};
 
     network::GetAPIMessager *apimessager;
 
@@ -300,6 +302,7 @@ namespace rfb {
                           rdr::U8 &trackingFrameStats, char trackingClient[]);
 
     bool sendWatermark;
+    const video_encoders::EncoderProbe &encoder_probe;
   };
 
 };

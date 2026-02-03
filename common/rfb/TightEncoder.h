@@ -29,16 +29,16 @@ namespace rfb {
   class TightEncoder : public Encoder {
   public:
     TightEncoder(SConnection* conn);
-    virtual ~TightEncoder();
+    ~TightEncoder() override = default;
 
-    virtual bool isSupported();
+    bool isSupported() const override;
 
-    virtual void setCompressLevel(int level);
+    void setCompressLevel(int level) override;
 
-    virtual void writeRect(const PixelBuffer* pb, const Palette& palette);
-    virtual void writeSolidRect(int width, int height,
+    void writeRect(const PixelBuffer* pb, const Palette& palette) override;
+    void writeSolidRect(int width, int height,
                                 const PixelFormat& pf,
-                                const rdr::U8* colour);
+                                const rdr::U8* colour) override;
     void writeWatermarkRect(const rdr::U8 *data, const unsigned len,
                             const rdr::U8 r,
                             const rdr::U8 g,

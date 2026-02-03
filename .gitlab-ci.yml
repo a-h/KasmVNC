@@ -242,7 +242,6 @@ run_test_arm64:
   dependencies:
     - build_arm64
   artifacts:
-  artifacts:
     when: always
     paths:
       - run_test/core_dumps/*/core

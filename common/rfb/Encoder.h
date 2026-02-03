@@ -21,7 +21,7 @@
 #define __RFB_ENCODER_H__
 
 #include <rdr/types.h>
-#include <rfb/Rect.h>
+#include <rfb/SConnection.h>
 
 namespace rfb {
   class SConnection;
@@ -41,14 +41,16 @@ namespace rfb {
 
   class Encoder {
   public:
-    Encoder(SConnection* conn, int encoding,
-            enum EncoderFlags flags, unsigned int maxPaletteSize);
-    virtual ~Encoder();
+      using Id = uint32_t;
+      static constexpr auto UndefinedId = std::numeric_limits<Id>::max();
+      Encoder(SConnection* conn, int encoding, EncoderFlags flags, unsigned int maxPaletteSize);
+      Encoder(Id id, SConnection* conn, int encoding, EncoderFlags flags, unsigned int maxPaletteSize);
+      virtual ~Encoder() = default;
 
     // isSupported() should return a boolean indicating if this encoder
     // is okay to use with the current connection. This usually involves
     // checking the list of encodings in the connection parameters.
-    virtual bool isSupported()=0;
+    virtual bool isSupported() const = 0;
 
     virtual void setCompressLevel(int level) {};
     virtual void setQualityLevel(int level) {};
@@ -82,6 +84,8 @@ namespace rfb {
                                 const PixelFormat& pf,
                                 const rdr::U8* colour)=0;
 
+      [[nodiscard]] Id getId() const { return id; }
+
   protected:
     // Helper method for redirecting a single colour palette to the
     // short cut method.
@@ -89,13 +93,14 @@ namespace rfb {
 
   public:
     const int encoding;
-    const enum EncoderFlags flags;
+    const EncoderFlags flags;
 
     // Maximum size of the palette per rect
     const unsigned int maxPaletteSize;
 
   protected:
-    SConnection* conn;
+      SConnection* conn;
+      Id id;
   };
 }
 
