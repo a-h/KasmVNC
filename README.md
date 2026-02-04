@@ -270,3 +270,5 @@ See the [builder/README.md](https://github.com/kasmtech/KasmVNC/blob/master/buil
 
 ### License and Acknowledgements
 See the [LICENSE.TXT](https://github.com/kasmtech/KasmVNC/blob/master/LICENSE.TXT) and [ACKNOWLEDGEMENTS.md](https://github.com/kasmtech/KasmVNC/blob/master/ACKNOWLEDGEMENTS.md)
+
+This project is tested with BrowserStack.
