@@ -1,5 +1,5 @@
 {
-  description = "KasmVNC development environment";
+  description = "KasmVNC";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -95,6 +95,7 @@
           patchelf
           perl
           perlPackages.Switch
+          openssh
         ];
 
         xorgVersion = "21.1.7";
@@ -188,6 +189,10 @@
             # Set compiler flags to find headers
             export CFLAGS="-I${pkgs.lib.makeSearchPath "include" (libraries ++ xorgDeps)} -Wno-format-security $CFLAGS"
             export CXXFLAGS="-I${pkgs.lib.makeSearchPath "include" (libraries ++ xorgDeps)} -Wno-format-security $CXXFLAGS"
+
+            # Ensure git uses Nix-provided ssh (avoids system GLIBC mismatch)
+            export GIT_SSH="${pkgs.openssh}/bin/ssh"
+            export GIT_SSH_COMMAND="${pkgs.openssh}/bin/ssh"
             
             # Set CMake policy for modern CMake versions on nixos-unstable
             export CMAKE_POLICY_DEFAULT_CMP0022=NEW
