@@ -30,8 +30,11 @@ if [ ! -d unix/xserver/include ]; then
   echo "Downloading X.Org server ${XORG_VER}..."
   TARBALL="xorg-server-${XORG_VER}.tar.gz"
   TARBALL_PATH="$TMPDIR/$TARBALL"
-  
-  if [ ! -f "$TARBALL_PATH" ]; then
+
+  if [ -n "${XORG_TARBALL_PATH:-}" ] && [ -f "$XORG_TARBALL_PATH" ]; then
+    echo "Using provided tarball: $XORG_TARBALL_PATH"
+    TARBALL_PATH="$XORG_TARBALL_PATH"
+  elif [ ! -f "$TARBALL_PATH" ]; then
     echo "Fetching $TARBALL from X.Org archives..."
     wget --no-check-certificate -O "$TARBALL_PATH" https://www.x.org/archive/individual/xserver/"$TARBALL"
   else
@@ -146,8 +149,12 @@ touch man/man1/Xserver.1
 cp ../unix/xserver/hw/vnc/Xvnc.man man/man1/Xvnc.1 2>/dev/null || echo "Note: Xvnc.man not found"
 
 cd lib
-# Link to DRI directory for hardware acceleration
-if [ -d /usr/lib/x86_64-linux-gnu/dri ]; then
+# Copy DRI drivers from Mesa if provided, or try to link to system paths
+if [ -n "${MESA_DRI_DRIVERS:-}" ] && [ -d "${MESA_DRI_DRIVERS}" ]; then
+  echo "Copying Mesa DRI drivers from ${MESA_DRI_DRIVERS}..."
+  mkdir -p dri
+  cp -v "${MESA_DRI_DRIVERS}"/* dri/ 2>/dev/null || echo "Note: Some DRI drivers could not be copied"
+elif [ -d /usr/lib/x86_64-linux-gnu/dri ]; then
   ln -sfn /usr/lib/x86_64-linux-gnu/dri dri
 elif [ -d /usr/lib/aarch64-linux-gnu/dri ]; then
   ln -sfn /usr/lib/aarch64-linux-gnu/dri dri
@@ -189,111 +196,3 @@ echo "  mkdir -p ~/.vnc"
 echo "  openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout ~/.vnc/self.pem -out ~/.vnc/self.pem -subj '/C=US/ST=VA/L=None/O=None/OU=DoFu/CN=kasm/emailAddress=none@none.none'"
 echo "  ./xorg.build/bin/Xvnc -interface 0.0.0.0 -disableBasicAuth -Log *:stdout:100 -sslOnly 1 -cert ~/.vnc/self.pem -key ~/.vnc/self.pem :1"
 echo ""
-#!/usr/bin/env bash
-
-set -e
-
-echo "Building KasmVNC..."
-echo ""
-
-# Download and extract X.Org server if not already done
-if [ ! -d unix/xserver/include ]; then
-  echo "Downloading X.Org server ${XORG_VER}..."
-  cd /tmp
-  TARBALL="xorg-server-${XORG_VER}.tar.gz"
-  if [ ! -f "$TARBALL" ]; then
-    wget --no-check-certificate https://www.x.org/archive/individual/xserver/"$TARBALL"
-  fi
-  cd "$OLDPWD"
-  
-  echo "Extracting X.Org server..."
-  tar -C unix/xserver -xf /tmp/xorg-server-${XORG_VER}.tar.gz --strip-components=1
-  
-  # Restore hw/vnc directory from git (tarball extraction deletes it)
-  git restore unix/xserver/hw/vnc
-  git restore unix/xserver/.gitignore
-fi
-
-# Build KasmVNC
-echo "Building KasmVNC..."
-export CFLAGS="-Wno-format-security"
-export CXXFLAGS="-Wno-format-security"
-cmake -DCMAKE_BUILD_TYPE=Release . -DBUILD_VIEWER:BOOL=OFF -DENABLE_GNUTLS:BOOL=OFF
-make -j"$(nproc)"
-
-# Build X.Org server if not already built
-if [ ! -f unix/xserver/hw/vnc/Xvnc ]; then
-  echo "Building X.Org server..."
-  cd unix/xserver
-  
-  # Apply patches
-  XORG_PATCH=21
-  patch -Np1 --forward -i ../xserver"${XORG_PATCH}".patch || true
-  
-  # Fix AM_INIT_AUTOMAKE for newer automake versions
-  sed -i 's/AM_INIT_AUTOMAKE(\[foreign dist-xz\])/AM_INIT_AUTOMAKE([foreign dist-xz subdir-objects])/' configure.ac
-  
-  autoreconf -vfi
-  
-  # Configure X.Org with proper library flags
-  LDFLAGS="-lz -lpng -ltbb -ljpeg -lfmt -lcpuid" ./configure \
-    --disable-config-hal \
-    --disable-config-udev \
-    --disable-dmx \
-    --disable-dri \
-    --disable-dri2 \
-    --disable-kdrive \
-    --disable-static \
-    --disable-xephyr \
-    --disable-xinerama \
-    --disable-xnest \
-    --disable-xorg \
-    --disable-xvfb \
-    --disable-xwayland \
-    --disable-xwin \
-    --enable-glx \
-    --prefix=/opt/kasmweb \
-    --with-default-font-path="/usr/share/fonts/X11/misc,/usr/share/fonts/X11/cyrillic,/usr/share/fonts/X11/100dpi/:unscaled,/usr/share/fonts/X11/75dpi/:unscaled,/usr/share/fonts/X11/Type1,/usr/share/fonts/X11/100dpi,/usr/share/fonts/X11/75dpi,built-ins" \
-    --without-dtrace \
-    --with-sha1=libcrypto \
-    --with-xkb-bin-directory=/usr/bin \
-    --with-xkb-output=/var/lib/xkb \
-    --with-xkb-path=/usr/share/X11/xkb
-  
-  make -j"$(nproc)"
-  cd ../..
-fi
-
-# Create build structure
-echo "Creating build structure..."
-mkdir -p xorg.build/bin
-mkdir -p xorg.build/lib
-mkdir -p xorg.build/man/man1
-
-cd xorg.build/bin/
-ln -sfn ../../unix/xserver/hw/vnc/Xvnc Xvnc
-cd ..
-
-touch man/man1/Xserver.1
-cp ../unix/xserver/hw/vnc/Xvnc.man man/man1/Xvnc.1
-
-cd lib
-if [ -d /usr/lib/x86_64-linux-gnu/dri ]; then
-  ln -sfn /usr/lib/x86_64-linux-gnu/dri dri
-elif [ -d /usr/lib/aarch64-linux-gnu/dri ]; then
-  ln -sfn /usr/lib/aarch64-linux-gnu/dri dri
-elif [ -d /usr/lib/arm-linux-gnueabihf/dri ]; then
-  ln -sfn /usr/lib/arm-linux-gnueabihf/dri dri
-elif [ -d /usr/lib/xorg/modules/dri ]; then
-  ln -sfn /usr/lib/xorg/modules/dri dri
-else
-  ln -sfn /usr/lib64/dri dri 2>/dev/null || true
-fi
-cd ../..
-
-# Create server tarball
-echo "Creating server tarball..."
-make servertarball
-
-echo ""
-echo "Build complete! Tarball created: kasmvnc-*.tar.gz"

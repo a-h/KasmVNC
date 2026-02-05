@@ -39,5 +39,11 @@ alpine/.abuild/kasmvnc_signing_key.rsa
 alpine/.abuild/kasmvnc_signing_key.rsa.pub
 alpine/packages/
 
+# direnv structure.
 /.direnv
+
+# Build outputs.
 /build
+
+# Nix artifacts.
+/result

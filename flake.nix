@@ -14,48 +14,6 @@
           config.allowUnfree = true;
         };
 
-        # util-macros from https://github.com/NixOS/nixpkgs/blob/408852040c85566581528ecadf661e2c04037ac7/pkgs/top-level/aliases.nix#L2138
-        util-macros = pkgs.stdenv.mkDerivation (finalAttrs: {
-          pname = "util-macros";
-          version = "1.20.2";
-
-          src = pkgs.fetchFromGitLab {
-            domain = "gitlab.freedesktop.org";
-            group = "xorg";
-            owner = "util";
-            repo = "macros";
-            rev = "util-macros-${finalAttrs.version}";
-            hash = "sha256-COIWe7GMfbk76/QUIRsN5yvjd6MEarI0j0M+Xa0WoKQ=";
-          };
-
-          strictDeps = true;
-
-          nativeBuildInputs = [ pkgs.autoreconfHook ];
-
-          passthru = {
-            tests.pkg-config = pkgs.testers.testMetaPkgConfig finalAttrs.finalPackage;
-            updateScript = pkgs.gitUpdater {
-              rev-prefix = "util-macros-";
-              ignoredVersions = "1_0_2";
-            };
-          };
-
-          meta = {
-            description = "GNU autoconf macros shared across X.Org projects";
-            homepage = "https://gitlab.freedesktop.org/xorg/util/macros";
-            license = with pkgs.lib.licenses; [
-              hpndSellVariant
-              mit
-            ];
-            maintainers = with pkgs.lib.maintainers; [
-              raboof
-              jopejoe1
-            ];
-            pkgConfigModules = [ "xorg-macros" ];
-            platforms = pkgs.lib.platforms.unix;
-          };
-        });
-
         # X.Org server dependencies
         xorgDeps = with pkgs.xorg; [
           xorgproto
@@ -91,7 +49,7 @@
           quilt
           git
           wget
-          util-macros
+          util-macros  # From nixpkgs
         ];
 
         # Required libraries
@@ -139,8 +97,64 @@
           perlPackages.Switch
         ];
 
+        xorgVersion = "21.1.7";
+
+        xorgServerTarball = pkgs.fetchurl {
+          url = "https://www.x.org/archive/individual/xserver/xorg-server-${xorgVersion}.tar.gz";
+          sha256 = "1gygpqancbcw9dd3wc168hna6a4n8cj16n3pm52kda3ygks0b40s";
+        };
+
+        kasmvncDerivation = pkgs.stdenv.mkDerivation {
+          pname = "kasmvnc";
+          version = "1.3.4";
+
+          src = pkgs.lib.cleanSource ./.;
+          stdenv = pkgs.gcc14Stdenv;
+
+          nativeBuildInputs = buildDeps ++ devTools;
+          buildInputs = xorgDeps ++ libraries;
+
+          XORG_VER = xorgVersion;
+          KASMVNC_BUILD_OS = "nixos";
+          KASMVNC_BUILD_OS_CODENAME = "nixos";
+          XORG_TARBALL_PATH = xorgServerTarball;
+          MESA_DRI_DRIVERS = "${pkgs.mesa}/lib/dri";
+
+          dontConfigure = true;
+
+          buildPhase = ''
+            bash ./build.sh
+          '';
+
+          installPhase = ''
+            mkdir -p "$out"
+            tarball=$(ls -1 kasmvnc-*.tar.gz | head -n1)
+            if [ -z "$tarball" ]; then
+              echo "No kasmvnc tarball produced" >&2
+              exit 1
+            fi
+            tar -xzf "$tarball" -C "$out"
+            if [ -d "$out/usr/local" ]; then
+              mv "$out/usr/local"/* "$out"/
+              rmdir "$out/usr/local" || true
+              rmdir "$out/usr" || true
+            fi
+          '';
+
+          meta = with pkgs.lib; {
+            description = "KasmVNC server and web client";
+            homepage = "https://github.com/kasmtech/KasmVNC";
+            license = licenses.gpl2Plus;
+            platforms = platforms.linux;
+          };
+        };
+
       in
       {
+        packages.kasmvnc = kasmvncDerivation;
+
+        packages.default = kasmvncDerivation;
+
         devShells.default = pkgs.mkShell {
           stdenv = pkgs.gcc14Stdenv;
           buildInputs = xorgDeps ++ buildDeps ++ libraries ++ devTools;
