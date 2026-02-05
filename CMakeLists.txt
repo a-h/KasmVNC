@@ -2,9 +2,9 @@
 # Setup
 #
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5...3.28)
 if(POLICY CMP0022)
-  cmake_policy(SET CMP0022 OLD)
+  cmake_policy(SET CMP0022 NEW)
 endif()
 
 # Internal cmake modules
@@ -155,10 +155,10 @@ find_package(Freetype REQUIRED)
 include_directories(${FREETYPE_INCLUDE_DIRS})
 
 # Staticly link libjpeg-turbo
-set(JPEG_LIBRARIES "-Wl,-Bstatic -lturbojpeg -Wl,-Bdynamic")
+# set(JPEG_LIBRARIES "-Wl,-Bstatic -lturbojpeg -Wl,-Bdynamic")
 # Warn if it doesn't seem to be the accelerated libjpeg that's found
-set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
-set(CMAKE_REQUIRED_FLAGS -I${JPEG_INCLUDE_DIR})
+# set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
+# set(CMAKE_REQUIRED_FLAGS -I${JPEG_INCLUDE_DIR})
 
 set(JPEG_TEST_SOURCE "\n
   #include <stdio.h>\n

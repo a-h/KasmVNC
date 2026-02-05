@@ -38,3 +38,6 @@ run_test/
 alpine/.abuild/kasmvnc_signing_key.rsa
 alpine/.abuild/kasmvnc_signing_key.rsa.pub
 alpine/packages/
+
+/.direnv
+/build
