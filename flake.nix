@@ -209,8 +209,8 @@
       {
         packages.kasmvnc-www = kasmvncWeb;
         # After building, you can run the server with:
-        # ./result/bin/Xvnc -interface 0.0.0.0 -disableBasicAuth -Log '*:stdout:100' -sslOnly 0 -httpd ./result/share/kasmvnc/www :1
-        # Then access the web client http://localhost:6800
+        # ./result/bin/Xvnc -interface 0.0.0.0 -SecurityTypes None -Log '*:stdout:100' -httpd ./result/share/kasmvnc/www :1
+        # Then access the web client at http://localhost:6800/
         packages.kasmvnc = kasmvncDerivation;
         packages.default = kasmvncDerivation;
 
