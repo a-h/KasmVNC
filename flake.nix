@@ -96,6 +96,7 @@
           perl
           perlPackages.Switch
           openssh
+          nodejs
         ];
 
         xorgVersion = "21.1.7";
@@ -105,6 +106,39 @@
           sha256 = "1gygpqancbcw9dd3wc168hna6a4n8cj16n3pm52kda3ygks0b40s";
         };
 
+        # Build web assets (noVNC) as a separate derivation
+        kasmvncWeb = pkgs.buildNpmPackage {
+          pname = "kasmvnc-www";
+          version = "1.3.4";
+
+          src = pkgs.fetchFromGitHub {
+            owner = "kasmtech";
+            repo = "noVNC";
+            rev = "v1.3.0";
+            sha256 = "sha256-NS0vE+YG0CR6RgJhOruO0UDGgMYICPuVzbmWM7mcKXY=";
+          };
+
+          npmDepsHash = "sha256-2doaGFuJsHwuXQ0RwiibBdZMIAazDlIjlV7ECc4Mwk0=";
+          npmFlags = [ "--include=dev" "--legacy-peer-deps" "--ignore-scripts" ];
+          npmBuild = "npm run build";
+          NODE_OPTIONS = "--openssl-legacy-provider";
+
+          installPhase = ''
+            mkdir -p $out
+            # Copy everything from source (app/, vendor/, vnc.html, etc.)
+            cp -r . $out/
+            # Also copy dist/ contents if they exist to ensure all bundles are present
+            [ -d dist ] && cp -r dist/* $out/
+          '';
+
+          meta = with pkgs.lib; {
+            description = "KasmVNC web client assets";
+            homepage = "https://github.com/kasmtech/noVNC";
+            license = licenses.mpl20;
+            platforms = platforms.linux;
+          };
+        };
+
         kasmvncDerivation = pkgs.stdenv.mkDerivation {
           pname = "kasmvnc";
           version = "1.3.4";
@@ -112,7 +146,7 @@
           src = pkgs.lib.cleanSource ./.;
           stdenv = pkgs.gcc14Stdenv;
 
-          nativeBuildInputs = buildDeps ++ devTools;
+          nativeBuildInputs = buildDeps ++ devTools ++ [ pkgs.makeWrapper ];
           buildInputs = xorgDeps ++ libraries;
 
           XORG_VER = xorgVersion;
@@ -120,11 +154,26 @@
           KASMVNC_BUILD_OS_CODENAME = "nixos";
           XORG_TARBALL_PATH = xorgServerTarball;
           MESA_DRI_DRIVERS = "${pkgs.mesa}/lib/dri";
+          KASMVNC_WEB_DIST = kasmvncWeb;
 
           dontConfigure = true;
 
+          preBuild = ''
+            # Copy pre-built web assets to both kasmweb/dist and builder/www
+            echo "Copying web assets from ${kasmvncWeb}..."
+            mkdir -p kasmweb/dist builder/www
+            cp -r --no-preserve=mode,ownership ${kasmvncWeb}/* kasmweb/dist/
+            cp -r --no-preserve=mode,ownership ${kasmvncWeb}/* builder/www/
+            chmod -R u+rwX kasmweb/dist builder/www
+            echo "Web assets copied successfully"
+            ls -la kasmweb/dist/ | head -20
+            ls -la builder/www/ | head -20
+          '';
+
           buildPhase = ''
+            runHook preBuild
             bash ./build.sh
+            runHook postBuild
           '';
 
           installPhase = ''
@@ -140,6 +189,12 @@
               rmdir "$out/usr/local" || true
               rmdir "$out/usr" || true
             fi
+            if [ -x "$out/bin/Xvnc" ]; then
+              mv "$out/bin/Xvnc" "$out/bin/Xvnc.real"
+              makeWrapper "$out/bin/Xvnc.real" "$out/bin/Xvnc" \
+                --set XKB_COMP "${pkgs.xorg.xkbcomp}/bin/xkbcomp" \
+                --set XKB_CONFIG_ROOT "${pkgs.xkeyboard-config}/share/X11/xkb"
+            fi
           '';
 
           meta = with pkgs.lib; {
@@ -152,8 +207,11 @@
 
       in
       {
+        packages.kasmvnc-www = kasmvncWeb;
+        # After building, you can run the server with:
+        # ./result/bin/Xvnc -interface 0.0.0.0 -disableBasicAuth -Log '*:stdout:100' -sslOnly 0 -httpd ./result/share/kasmvnc/www :1
+        # Then access the web client http://localhost:6800
         packages.kasmvnc = kasmvncDerivation;
-
         packages.default = kasmvncDerivation;
 
         devShells.default = pkgs.mkShell {
@@ -165,6 +223,7 @@
             echo "================================"
             echo ""
             echo "Run './build.sh' to build KasmVNC"
+            echo "To build web assets: cd kasmweb && npm install && npm run build"
             echo ""
 
             # Set environment variables
