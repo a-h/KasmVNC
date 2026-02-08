@@ -49,7 +49,7 @@
           quilt
           git
           wget
-          util-macros  # From nixpkgs
+          util-macros # From nixpkgs
         ];
 
         # Required libraries
@@ -106,22 +106,34 @@
           sha256 = "1gygpqancbcw9dd3wc168hna6a4n8cj16n3pm52kda3ygks0b40s";
         };
 
+
+        # For some reason, noVNC explicitly gitignores the package-lock.json, so
+        # it's vendored in this repo.
+        kasmvncWebLock = builtins.path {
+          path = ./package-lock.json;
+          name = "package-lock.json";
+        };
+
         # Build web assets (noVNC) as a separate derivation
         kasmvncWeb = pkgs.buildNpmPackage {
           pname = "kasmvnc-www";
-          version = "1.3.4";
+          version = "1.3.1";
 
           src = pkgs.fetchFromGitHub {
             owner = "kasmtech";
             repo = "noVNC";
-            rev = "v1.3.0";
-            sha256 = "sha256-NS0vE+YG0CR6RgJhOruO0UDGgMYICPuVzbmWM7mcKXY=";
+            rev = "release/1.3.1";
+            sha256 = "sha256-lbNPJ1yRUQp/ppsdQQGlo6ceYa2l0tzsDnDrTZZ1zkM=";
           };
 
-          npmDepsHash = "sha256-2doaGFuJsHwuXQ0RwiibBdZMIAazDlIjlV7ECc4Mwk0=";
+          npmDepsHash = "sha256-RWcdYHsENALjGpOl7x1zjpvonW8QGXZ9U880Q8ymfwQ=";
           npmFlags = [ "--include=dev" "--legacy-peer-deps" "--ignore-scripts" ];
           npmBuild = "npm run build";
           NODE_OPTIONS = "--openssl-legacy-provider";
+
+          postPatch = ''
+            cp ${kasmvncWebLock} package-lock.json
+          '';
 
           installPhase = ''
             mkdir -p $out
