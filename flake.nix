@@ -99,6 +99,17 @@
           nodejs
         ];
 
+        # Perl with all KasmVNC dependencies
+        perlWithKasmVncDeps = pkgs.perl.withPackages (p: [
+          p.Switch
+          p.ListMoreUtils
+          p.TryTiny
+          p.DateTime
+          p.DateTimeTimeZone
+          p.YAMLTiny
+          p.HashMergeSimple
+        ]);
+
         xorgVersion = "21.1.7";
 
         xorgServerTarball = pkgs.fetchurl {
@@ -201,11 +212,31 @@
               rmdir "$out/usr/local" || true
               rmdir "$out/usr" || true
             fi
+            
+            # Wrap Xvnc with xkb paths
             if [ -x "$out/bin/Xvnc" ]; then
               mv "$out/bin/Xvnc" "$out/bin/Xvnc.real"
               makeWrapper "$out/bin/Xvnc.real" "$out/bin/Xvnc" \
                 --set XKB_COMP "${pkgs.xorg.xkbcomp}/bin/xkbcomp" \
                 --set XKB_CONFIG_ROOT "${pkgs.xkeyboard-config}/share/X11/xkb"
+            fi
+            
+            # Wrap vncserver with Perl and PERL5LIB
+            if [ -x "$out/bin/vncserver" ]; then
+              # Patch shebang to use our Perl with all dependencies
+              sed -i '1s|^#!.*perl.*|#!${perlWithKasmVncDeps}/bin/perl|' "$out/bin/vncserver"
+              
+              # Wrap with PERL5LIB pointing to custom KasmVNC modules and runtime dependencies
+              mv "$out/bin/vncserver" "$out/bin/vncserver.real"
+              makeWrapper "$out/bin/vncserver.real" "$out/bin/vncserver" \
+                --set PERL5LIB "$out/bin" \
+                --prefix PATH : "${pkgs.lib.makeBinPath [ 
+                  pkgs.xorg.xauth 
+                  pkgs.xorg.xdpyinfo
+                  pkgs.nettools 
+                  pkgs.coreutils 
+                  pkgs.gnugrep 
+                ]}"
             fi
           '';
 
